@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accounting Management System</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ============ LOGIN SCREEN ============ -->
+  <section id="auth-screen" class="auth-screen">
+    <form id="auth-form" class="auth-card">
+      <div class="logo">A</div>
+      <h1>Accounting System</h1>
+      <p class="muted">Log in or create an account to continue</p>
+
+      <label>Email
+        <input type="email" id="email" required autocomplete="email">
+      </label>
+      <label>Password
+        <input type="password" id="password" required minlength="6" autocomplete="current-password">
+      </label>
+
+      <p id="auth-msg" class="auth-msg"></p>
+      <button type="submit" class="btn primary block">Log in</button>
+      <button type="button" id="signup-btn" class="btn ghost block">Create account</button>
+    </form>
+  </section>
+
+  <!-- ============ MAIN APP ============ -->
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="brand"><span class="logo small">A</span> Accounting System</div>
+      <nav class="tabs">
+        <button class="tab active" data-view="accounts">Chart of Accounts</button>
+        <button class="tab" data-view="journal">Business Transactions</button>
+        <button class="tab" data-view="adjust">Adjustments</button>
+        <button class="tab" data-view="trial">Trial Balance</button>
+      </nav>
+      <div class="user">
+        <span id="user-email" class="muted"></span>
+        <button id="logout-btn" class="btn outline">Log out</button>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- 1. CHART OF ACCOUNTS -->
+      <section id="view-accounts" class="view">
+        <div class="page-head">
+          <div>
+            <h2>Chart of Accounts</h2>
+            <p class="muted">The list of all accounts your business uses.</p>
+          </div>
+          <button id="seed-btn" class="btn outline">Load starter accounts</button>
+        </div>
+
+        <form id="account-form" class="card row">
+          <label>Code <input id="acc-code" required placeholder="1000"></label>
+          <label class="grow">Account name <input id="acc-name" required placeholder="Cash"></label>
+          <label>Type
+            <select id="acc-type">
+              <option>Asset</option><option>Liability</option><option>Equity</option>
+              <option>Revenue</option><option>Expense</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="acc-contra"> Contra account</label>
+          <button class="btn primary" type="submit">Add account</button>
+        </form>
+
+        <div class="card">
+          <table>
+            <thead><tr><th>Code</th><th>Account name</th><th>Type</th><th>Normal balance</th><th></th></tr></thead>
+            <tbody id="accounts-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 2. BUSINESS TRANSACTIONS -->
+      <section id="view-journal" class="view hidden">
+        <div class="page-head">
+          <div>
+            <h2>Business Transactions</h2>
+            <p class="muted">Record each transaction as a journal entry (debits must equal credits).</p>
+          </div>
+        </div>
+        <div id="journal-form" class="card"></div>
+        <h3>Recorded entries</h3>
+        <div id="journal-list"></div>
+      </section>
+
+      <!-- 3. ADJUSTMENTS -->
+      <section id="view-adjust" class="view hidden">
+        <div class="page-head">
+          <div>
+            <h2>Adjustments</h2>
+            <p class="muted">Adjusting entries (accruals, deferrals, depreciation) made at period end.</p>
+          </div>
+        </div>
+        <div id="adjust-form" class="card"></div>
+        <h3>Recorded adjustments</h3>
+        <div id="adjust-list"></div>
+      </section>
+
+      <!-- 4. TRIAL BALANCE -->
+      <section id="view-trial" class="view hidden">
+        <div class="page-head">
+          <div>
+            <h2>Trial Balance</h2>
+            <p class="muted">Computed automatically from your entries and adjustments.</p>
+          </div>
+          <label class="inline">As of date
+            <input type="date" id="tb-date">
+          </label>
+        </div>
+        <div id="tb-status"></div>
+        <div class="card scroll">
+          <table id="tb-table"></table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>

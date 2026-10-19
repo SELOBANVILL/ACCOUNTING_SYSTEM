@@ -130,7 +130,7 @@ function renderAll() {
 function renderAccounts() {
   const body = $('#accounts-body');
   if (!state.accounts.length) {
-    body.innerHTML = '<tr><td colspan="5" class="empty">No accounts yet. Add one above or click "Load starter accounts".</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="empty">No accounts yet. Add your first account using the form above.</td></tr>';
     return;
   }
   body.innerHTML = state.accounts.map(a => `
@@ -146,13 +146,10 @@ function renderAccounts() {
 $('#account-form').addEventListener('submit', async e => {
   e.preventDefault();
   const type = $('#acc-type').value;
-  const contra = $('#acc-contra').checked;
-  let normal = NORMAL[type];
-  if (contra) normal = normal === 'debit' ? 'credit' : 'debit';   // contra = opposite side
 
   const { error } = await sb.from('accounts').insert({
     code: $('#acc-code').value.trim(), name: $('#acc-name').value.trim(),
-    type, normal_balance: normal
+    type, normal_balance: NORMAL[type]      // normal balance now comes only from the type
   });
   if (error) return toast(error.code === '23505' ? 'That account code already exists.' : error.message, true);
   e.target.reset();
@@ -167,33 +164,6 @@ $('#accounts-body').addEventListener('click', async e => {
   if (error) return toast(error.code === '23503'
     ? 'This account is used in journal entries and cannot be deleted.' : error.message, true);
   toast('Account deleted');
-  loadAll();
-});
-
-$('#seed-btn').addEventListener('click', async () => {
-  if (state.accounts.length && !confirm('Add the starter accounts to your existing list?')) return;
-  const starter = [
-    ['1000', 'Cash', 'Asset'], ['1100', 'Accounts Receivable', 'Asset'], ['1200', 'Supplies', 'Asset'],
-    ['1300', 'Prepaid Insurance', 'Asset'], ['1500', 'Equipment', 'Asset'],
-    ['1510', 'Accumulated Depreciation', 'Asset', true],
-    ['2000', 'Accounts Payable', 'Liability'], ['2100', 'Salaries Payable', 'Liability'],
-    ['2200', 'Unearned Revenue', 'Liability'],
-    ['3000', "Owner's Capital", 'Equity'], ['3100', "Owner's Drawings", 'Equity', true],
-    ['4000', 'Service Revenue', 'Revenue'],
-    ['5000', 'Salaries Expense', 'Expense'], ['5100', 'Rent Expense', 'Expense'],
-    ['5200', 'Supplies Expense', 'Expense'], ['5300', 'Insurance Expense', 'Expense'],
-    ['5400', 'Depreciation Expense', 'Expense'], ['5500', 'Utilities Expense', 'Expense']
-  ];
-  const have = new Set(state.accounts.map(a => a.code));
-  const rows = starter.filter(s => !have.has(s[0])).map(([code, name, type, contra]) => {
-    let normal = NORMAL[type];
-    if (contra) normal = normal === 'debit' ? 'credit' : 'debit';
-    return { code, name, type, normal_balance: normal };
-  });
-  if (!rows.length) return toast('Starter accounts are already loaded.');
-  const { error } = await sb.from('accounts').insert(rows);
-  if (error) return toast(error.message, true);
-  toast('Starter accounts loaded');
   loadAll();
 });
 
@@ -351,12 +321,11 @@ function renderEntries(kind) {
 /* =====================================================
    8. TRIAL BALANCE (computed automatically, no ledger needed)
    ===================================================== */
-function computeTrial(asOf) {
+function computeTrial() {
   const rows = new Map(state.accounts.map(a =>
     [a.id, { acct: a, unadj: 0, adjDr: 0, adjCr: 0 }]));
 
   for (const entry of state.entries) {
-    if (asOf && entry.entry_date > asOf) continue;
     for (const l of entry.journal_lines) {
       const r = rows.get(l.account_id);
       if (!r) continue;
@@ -377,7 +346,7 @@ function computeTrial(asOf) {
 }
 
 function renderTrial() {
-  const rows = computeTrial($('#tb-date').value);
+  const rows = computeTrial();
   const table = $('#tb-table');
   const status = $('#tb-status');
 
@@ -417,7 +386,6 @@ function renderTrial() {
     ? '<span class="badge ok">✓ Trial balance is in balance: total debits equal total credits</span>'
     : `<span class="badge bad">Out of balance (adjusted difference: ${money(Math.abs(T.adr - T.acr))})</span>`;
 }
-$('#tb-date').addEventListener('change', renderTrial);
 
 /* =====================================================
    9. START

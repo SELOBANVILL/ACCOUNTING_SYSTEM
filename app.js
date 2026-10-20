@@ -72,7 +72,7 @@ $('#logout-btn').addEventListener('click', () => sb.auth.signOut());
 
 // Runs on page load and whenever someone logs in or out
 let currentUserId = null;
-sb.auth.onAuthStateChange((_event, session) => {
+sb.auth.onAuthStateChange((_event, session) => { 
   const uid = session?.user?.id || null;
   if (uid === currentUserId) return;      // ignore token refreshes
   currentUserId = uid;

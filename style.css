@@ -37,31 +37,44 @@ h3 { margin: 28px 0 12px; }
 .auth-msg { min-height: 20px; color: var(--bad); font-size: 13px; margin: 12px 0; }
 .auth-msg.info { color: var(--ok); }
 .logo {
-  width: 52px; height: 52px; margin: 0 auto; border-radius: 14px;
+  width: 64px; height: 52px; margin: 0 auto; border-radius: 14px;
   background: var(--maroon); color: #fff; display: grid; place-items: center;
-  font-weight: 800; font-size: 24px;
+  font-weight: 800; font-size: 20px; letter-spacing: .03em;
 }
-.logo.small { width: 32px; height: 32px; font-size: 16px; border-radius: 9px; margin: 0; }
+.logo.small { width: 44px; height: 36px; font-size: 14px; border-radius: 9px; margin: 0; }
+/* ---------- Sidebar ---------- */
+#app { display: flex; min-height: 100vh; }
 
-/* ---------- Top bar ---------- */
-.topbar {
-  background: var(--black); color: #fff; display: flex; align-items: center;
-  gap: 24px; padding: 12px 28px; position: sticky; top: 0; z-index: 10;
-  border-bottom: 3px solid var(--maroon);
+.sidebar {
+  width: 260px; flex-shrink: 0;
+  position: sticky; top: 0; height: 100vh;
+  background: var(--black); color: #fff;
+  display: flex; flex-direction: column; gap: 22px;
+  padding: 22px 16px;
+  border-right: 3px solid var(--maroon);
+  overflow-y: auto;
 }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; white-space: nowrap; }
-.tabs { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+.brand {
+  display: flex; align-items: center; gap: 10px; font-weight: 700;
+  padding: 0 8px 20px; border-bottom: 1px solid #2a2a2a;
+}
+.tabs { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .tab {
-  background: transparent; color: #c9c9ce; border: 0; padding: 9px 16px;
+  width: 100%; text-align: left;
+  background: transparent; color: #c9c9ce; border: 0; padding: 12px 14px;
   border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;
 }
 .tab:hover { background: #222; color: #fff; }
 .tab.active { background: var(--maroon); color: #fff; }
-.user { display: flex; align-items: center; gap: 12px; }
-.user .muted { color: #a9a9b0; font-size: 13px; }
+.user {
+  display: flex; flex-direction: column; gap: 10px;
+  padding-top: 16px; border-top: 1px solid #2a2a2a;
+}
+.user .muted { color: #a9a9b0; font-size: 13px; word-break: break-all; }
+.user .btn { width: 100%; }
 
-/* ---------- Layout ---------- */
-.content { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+/* ---------- Layout ---------- */ 
+.content { flex: 1; min-width: 0; padding: 32px 40px 60px; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 18px; }
 .card {
   background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
@@ -93,8 +106,8 @@ input:focus, select:focus { outline: 2px solid var(--maroon); outline-offset: -1
 .btn.ghost:hover { background: #f0dde1; }
 .btn.outline { background: transparent; border-color: var(--maroon); color: var(--maroon); }
 .btn.outline:hover { background: var(--maroon); color: #fff; }
-.topbar .btn.outline { border-color: #555; color: #fff; }
-.topbar .btn.outline:hover { background: var(--maroon); border-color: var(--maroon); }
+.sidebar .btn.outline { border-color: #555; color: #fff; }
+.sidebar .btn.outline:hover { background: var(--maroon); border-color: var(--maroon); }
 .btn.danger { background: transparent; color: var(--bad); border-color: #e8c4c1; padding: 6px 12px; font-size: 13px; }
 .btn.danger:hover { background: var(--bad); color: #fff; }
 .icon-btn { background: transparent; border: 0; color: var(--gray); cursor: pointer; font-size: 16px; padding: 6px 10px; border-radius: 6px; }
@@ -141,6 +154,12 @@ table.lines tfoot td { font-weight: 700; border-top: 2px solid var(--black); bor
 .toast.error { border-left-color: var(--bad); }
 
 @media (max-width: 800px) {
-  .topbar { flex-wrap: wrap; gap: 10px; padding: 12px; }
+  #app { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; border-right: 0; border-bottom: 3px solid var(--maroon); }
+  .tabs { flex-direction: row; flex-wrap: wrap; flex: none; }
+  .tab { width: auto; }
+  .user { flex-direction: row; align-items: center; justify-content: space-between; }
+  .user .btn { width: auto; }
+  .content { padding: 20px 16px 50px; }
   .page-head { flex-direction: column; align-items: flex-start; }
 }

@@ -28,24 +28,28 @@
     </form>
   </section>
 
-  <!-- ============ MAIN APP ============ -->
+ <!-- ============ MAIN APP ============ -->
   <div id="app" class="hidden">
-    <header class="topbar">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar">
       <div class="brand"><span class="logo small">AAA</span> Accounting System</div>
+
       <nav class="tabs">
         <button class="tab active" data-view="accounts">Chart of Accounts</button>
         <button class="tab" data-view="journal">Journaling</button>
         <button class="tab" data-view="adjust">Adjustments</button>
         <button class="tab" data-view="trial">Trial Balance</button>
       </nav>
+
       <div class="user">
         <span id="user-email" class="muted"></span>
         <button id="logout-btn" class="btn outline">Log out</button>
       </div>
-    </header>
+    </aside>
 
+    <!-- RIGHT CONTENT AREA -->
     <main class="content">
-
       <!-- 1. CHART OF ACCOUNTS -->
       <section id="view-accounts" class="view">
         <div class="page-head">

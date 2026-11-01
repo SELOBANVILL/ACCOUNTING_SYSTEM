@@ -1,5 +1,5 @@
 /* =====================================================
-   1. CONNECT TO SUPABASE  (paste your own values)
+   1. CONNECT TO SUPABASE
    ===================================================== */
 const SUPABASE_URL = 'https://othezxiodffoywrniyci.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90aGV6eGlvZGZmb3l3cm5peWNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxNjI4MjQsImV4cCI6MjEwNzczODgyNH0.Hsjyq3ybHX5DvyhQANeWDMJmgaYJA_Ej4fB5ylsUkiM';
@@ -12,13 +12,24 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const state = { accounts: [], entries: [] };
 
 const TYPE_ORDER = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'];
-// Normal balance of each account type (the side that INCREASES it)
 const NORMAL = { Asset: 'debit', Expense: 'debit', Liability: 'credit', Equity: 'credit', Revenue: 'credit' };
 
-// Money is calculated in CENTS (whole numbers) to avoid floating-point errors like 0.1 + 0.2
 const toCents = v => Math.round((parseFloat(v) || 0) * 100);
 const money = c => (c / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signedMoney = c => (c < 0 ? '-' : '') + money(Math.abs(c));
 const todayStr = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const isContra = a => NORMAL[a.type] !== a.normal_balance;
+
+// Fixed labels used on the financial statements
+const COMPANY_LABEL = 'Company';
+const OWNER_LABEL = 'Owner';
+
+function longDate(iso) {
+  if (!iso) return '';
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric'
+  });
+}
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -70,11 +81,10 @@ $('#signup-btn').addEventListener('click', async () => {
 
 $('#logout-btn').addEventListener('click', () => sb.auth.signOut());
 
-// Runs on page load and whenever someone logs in or out
 let currentUserId = null;
-sb.auth.onAuthStateChange((_event, session) => { 
+sb.auth.onAuthStateChange((_event, session) => {
   const uid = session?.user?.id || null;
-  if (uid === currentUserId) return;      // ignore token refreshes
+  if (uid === currentUserId) return;
   currentUserId = uid;
 
   if (session) {
@@ -91,15 +101,25 @@ sb.auth.onAuthStateChange((_event, session) => {
 });
 
 /* =====================================================
-   4. TABS
+   4. TABS / SIDEBAR
    ===================================================== */
+function closeSidebar() {
+  $('.sidebar').classList.remove('open');
+  $('#sidebar-backdrop').classList.remove('show');
+}
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
     document.querySelectorAll('.view').forEach(v =>
       v.classList.toggle('hidden', v.id !== 'view-' + btn.dataset.view));
+    closeSidebar();
   });
 });
+$('#sidebar-toggle').addEventListener('click', () => {
+  $('.sidebar').classList.toggle('open');
+  $('#sidebar-backdrop').classList.toggle('show');
+});
+$('#sidebar-backdrop').addEventListener('click', closeSidebar);
 
 /* =====================================================
    5. LOAD DATA FROM SUPABASE
@@ -121,6 +141,8 @@ function renderAll() {
   renderEntries('regular');
   renderEntries('adjusting');
   renderTrial();
+  renderIncome();
+  renderEquity();
   refreshSelects();
 }
 
@@ -146,10 +168,13 @@ function renderAccounts() {
 $('#account-form').addEventListener('submit', async e => {
   e.preventDefault();
   const type = $('#acc-type').value;
+  const contra = $('#acc-contra').checked;
+  let normal = NORMAL[type];
+  if (contra) normal = normal === 'debit' ? 'credit' : 'debit';
 
   const { error } = await sb.from('accounts').insert({
     code: $('#acc-code').value.trim(), name: $('#acc-name').value.trim(),
-    type, normal_balance: NORMAL[type]      // normal balance now comes only from the type
+    type, normal_balance: normal
   });
   if (error) return toast(error.code === '23505' ? 'That account code already exists.' : error.message, true);
   e.target.reset();
@@ -168,7 +193,7 @@ $('#accounts-body').addEventListener('click', async e => {
 });
 
 /* =====================================================
-   7. JOURNAL ENTRIES AND ADJUSTMENTS (one shared builder)
+   7. JOURNAL ENTRIES AND ADJUSTMENTS
    ===================================================== */
 function fillSelect(sel) {
   const keep = sel.value;
@@ -226,7 +251,6 @@ function buildEntryForm(kind) {
       <td><button type="button" class="icon-btn rm" title="Remove line">✕</button></td>`;
     fillSelect($('.acct-select', tr));
     const dr = $('.dr', tr), cr = $('.cr', tr);
-    // A line can be a debit OR a credit, never both
     dr.addEventListener('input', () => { if (toCents(dr.value) > 0) cr.value = ''; updateTotals(); });
     cr.addEventListener('input', () => { if (toCents(cr.value) > 0) dr.value = ''; updateTotals(); });
     $('.rm', tr).addEventListener('click', () => {
@@ -256,7 +280,7 @@ function buildEntryForm(kind) {
     for (const tr of linesBody.querySelectorAll('tr')) {
       const acct = $('.acct-select', tr).value;
       const dr = toCents($('.dr', tr).value), cr = toCents($('.cr', tr).value);
-      if (!acct && !dr && !cr) continue;                  // skip fully blank rows
+      if (!acct && !dr && !cr) continue;
       if (!acct) return toast('Every line with an amount needs an account.', true);
       if (!dr && !cr) return toast('Every selected account needs a debit or credit amount.', true);
       lines.push({ account_id: acct, debit: dr / 100, credit: cr / 100 });
@@ -285,7 +309,6 @@ function renderEntries(kind) {
     return;
   }
   box.innerHTML = list.map(e => {
-    // debit lines first, credit lines indented below (standard journal format)
     const lines = [...e.journal_lines].sort((a, b) => (b.debit > 0) - (a.debit > 0));
     const rows = lines.map(l => `
       <tr>
@@ -319,7 +342,7 @@ function renderEntries(kind) {
 });
 
 /* =====================================================
-   8. TRIAL BALANCE (computed automatically, no ledger needed)
+   8. TRIAL BALANCE (all entries, no date filter)
    ===================================================== */
 function computeTrial() {
   const rows = new Map(state.accounts.map(a =>
@@ -330,7 +353,7 @@ function computeTrial() {
       const r = rows.get(l.account_id);
       if (!r) continue;
       const dr = toCents(l.debit), cr = toCents(l.credit);
-      if (entry.kind === 'regular') r.unadj += dr - cr;   // net: positive = debit balance
+      if (entry.kind === 'regular') r.unadj += dr - cr;
       else { r.adjDr += dr; r.adjCr += cr; }
     }
   }
@@ -339,7 +362,7 @@ function computeTrial() {
   const out = [];
   for (const r of rows.values()) {
     const adjNet = r.unadj + r.adjDr - r.adjCr;
-    if (!r.unadj && !r.adjDr && !r.adjCr) continue;       // hide unused accounts
+    if (!r.unadj && !r.adjDr && !r.adjCr) continue;
     out.push({ acct: r.acct, u: split(r.unadj), adjDr: r.adjDr, adjCr: r.adjCr, a: split(adjNet) });
   }
   return sortAccounts(out.map(o => ({ ...o, type: o.acct.type, code: o.acct.code })));
@@ -355,6 +378,7 @@ function renderTrial() {
     status.innerHTML = '<div class="card empty">No transactions yet. Record entries to see the trial balance.</div>';
     return;
   }
+  status.innerHTML = '';
 
   const T = { udr: 0, ucr: 0, adr: 0, acr: 0, jdr: 0, jcr: 0 };
   const body = rows.map(r => {
@@ -388,7 +412,182 @@ function renderTrial() {
 }
 
 /* =====================================================
-   9. START
+   9. FINANCIAL STATEMENTS (all entries, dates from your entries)
+   ===================================================== */
+
+// Net debit-minus-credit for one account, across all entries and adjustments
+function netDrCr(accountId) {
+  let net = 0;
+  for (const e of state.entries) {
+    for (const l of e.journal_lines) {
+      if (l.account_id === accountId) net += toCents(l.debit) - toCents(l.credit);
+    }
+  }
+  return net;
+}
+
+// Decide what an account IS for the statements. Names win over the saved type,
+// so a wrongly typed account cannot distort net income or equity.
+function roleOf(acct) {
+  const n = acct.name;
+  if (/accumulated\s+depreciation/i.test(n)) return 'contra-asset';  // never an expense
+  if (/withdraw|drawing/i.test(n)) return 'drawings';                // owner withdrawals
+  if (acct.type === 'Revenue') return 'revenue';
+  if (acct.type === 'Expense') return 'expense';
+  if (acct.type === 'Equity') return 'capital';
+  return 'other';
+}
+
+// First and last entry dates, so headings follow your records (e.g. Dec 1 to Dec 31, 2024)
+function entryRange() {
+  const dates = state.entries.map(e => e.entry_date).sort();
+  return dates.length
+    ? { from: dates[0], to: dates[dates.length - 1] }
+    : { from: '', to: '' };
+}
+
+function periodCaption(from, to) {
+  if (!to) return '';
+  const sameMonth = from && from.slice(0, 7) === to.slice(0, 7);
+  return (sameMonth ? 'For the Month Ended ' : 'For the Period Ended ') + longDate(to);
+}
+
+// Label follows the result: "Net Income" when positive, "Net Loss" when negative
+const netLabel = n => (n < 0 ? 'Net Loss' : 'Net Income');
+function computeIncome() {
+  const revenues = [];
+  const expenses = [];
+  for (const acct of state.accounts) {
+    const role = roleOf(acct);
+    const net = netDrCr(acct.id);
+    if (role === 'revenue' && net) revenues.push({ acct, bal: -net });  // credits increase revenue
+    if (role === 'expense' && net) expenses.push({ acct, bal: net });   // debits increase expenses
+  }
+  const totalRev = revenues.reduce((s, r) => s + r.bal, 0);
+  const totalExp = expenses.reduce((s, r) => s + r.bal, 0);
+  return { revenues, expenses, totalRev, totalExp, net: totalRev - totalExp };
+}
+
+function stmtHeader(title) {
+  const { from, to } = entryRange();
+  return `
+    <div class="stmt-header">
+      <h2>${COMPANY_LABEL}</h2>
+      <h3>${title}</h3>
+      <p>${esc(periodCaption(from, to))}</p>
+    </div>`;
+}
+
+function renderIncome() {
+  const box = $('#income-report');
+  const { revenues, expenses, totalRev, totalExp, net } = computeIncome();
+
+  if (!revenues.length && !expenses.length) {
+    box.innerHTML = '<div class="empty">No revenue or expense activity yet.</div>';
+    return;
+  }
+
+  const revRows = revenues.map(r => `
+    <tr>
+      <td>${esc(r.acct.name)}</td>
+      <td class="amt"></td>
+      <td class="amt">${signedMoney(r.bal)}</td>
+    </tr>`).join('');
+  const extraRev = revenues.length > 1 ? `
+    <tr class="total-row">
+      <td>Total Revenue</td>
+      <td class="amt"></td>
+      <td class="amt single">${signedMoney(totalRev)}</td>
+    </tr>` : '';
+  const expRows = expenses.map(r => `
+    <tr>
+      <td class="nested">${esc(r.acct.name)}</td>
+      <td class="amt">${signedMoney(r.bal)}</td>
+      <td class="amt"></td>
+    </tr>`).join('');
+
+  box.innerHTML = `
+    <div class="statement">
+      ${stmtHeader('Statement of Income')}
+      <table class="stmt-table">
+        <tbody>
+          ${revRows}
+          ${extraRev}
+          <tr><td class="section">Less: Operating Expenses</td><td class="amt"></td><td class="amt"></td></tr>
+          ${expRows || '<tr><td class="nested">None</td><td class="amt">0.00</td><td class="amt"></td></tr>'}
+          <tr class="total-row">
+            <td></td>
+            <td class="amt single">${signedMoney(totalExp)}</td>
+            <td class="amt"></td>
+          </tr>
+          <tr class="net-row">
+            <td>${netLabel(net)}</td>
+            <td class="amt"></td>
+            <td class="amt double ${net < 0 ? 'loss' : ''}">${signedMoney(net)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderEquity() {
+  const box = $('#equity-report');
+
+  if (!state.accounts.length) {
+    box.innerHTML = '<div class="empty">Add equity accounts and transactions to build this statement.</div>';
+    return;
+  }
+
+  let investment = 0;   // credit balances of capital accounts
+  let withdrawal = 0;   // debit balances of drawings accounts
+  for (const acct of state.accounts) {
+    const role = roleOf(acct);
+    const net = netDrCr(acct.id);
+    if (role === 'capital') investment += -net;
+    if (role === 'drawings') withdrawal += net;
+  }
+
+  const { net } = computeIncome();
+  const niAndWd = net - withdrawal;
+  const ending = investment + net - withdrawal;
+  const { to } = entryRange();
+
+  box.innerHTML = `
+    <div class="statement">
+      ${stmtHeader("Statement of Owner's Equity")}
+      <table class="stmt-table">
+        <tbody>
+          <tr>
+            <td>Add: ${OWNER_LABEL} Investment</td>
+            <td class="amt"></td>
+            <td class="amt">${signedMoney(investment)}</td>
+          </tr>
+          <tr>
+            <td>${netLabel(net)}</td>
+            <td class="amt"></td>
+            <td class="amt ${net < 0 ? 'loss' : ''}">${signedMoney(net)}</td>
+          </tr>
+          <tr>
+            <td>Less: Withdrawal</td>
+            <td class="amt">${signedMoney(-withdrawal)}</td>
+            <td class="amt"></td>
+          </tr>
+          <tr class="total-row">
+            <td></td>
+            <td class="amt single ${niAndWd < 0 ? 'loss' : ''}">${signedMoney(niAndWd)}</td>
+            <td class="amt"></td>
+          </tr>
+          <tr class="net-row">
+            <td>Capital, ${esc(longDate(to))}</td>
+            <td class="amt"></td>
+            <td class="amt double">${signedMoney(ending)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+/* =====================================================
+   10. START
    ===================================================== */
 buildEntryForm('regular');
 buildEntryForm('adjusting');

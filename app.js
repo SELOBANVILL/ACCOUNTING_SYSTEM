@@ -143,6 +143,7 @@ function renderAll() {
   renderTrial();
   renderIncome();
   renderEquity();
+  renderPosition();
   refreshSelects();
 }
 
@@ -581,6 +582,81 @@ function renderEquity() {
             <td>Capital, ${esc(longDate(to))}</td>
             <td class="amt"></td>
             <td class="amt double">${signedMoney(ending)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderPosition() {
+  const box = $('#position-report');
+
+  const assets = [];
+  const liabilities = [];
+  let investment = 0;   // credit balances of capital accounts
+  let withdrawal = 0;   // debit balances of drawings accounts
+
+  for (const acct of state.accounts) {
+    const role = roleOf(acct);
+    const net = netDrCr(acct.id);
+    if (!net) continue;
+
+    if (role === 'contra-asset' || (role === 'other' && acct.type === 'Asset')) {
+      assets.push({ acct, bal: net });            // debits increase assets (contra shows negative)
+    } else if (role === 'other' && acct.type === 'Liability') {
+      liabilities.push({ acct, bal: -net });      // credits increase liabilities
+    } else if (role === 'capital') {
+      investment += -net;
+    } else if (role === 'drawings') {
+      withdrawal += net;
+    }
+  }
+
+  if (!assets.length && !liabilities.length && !investment && !withdrawal) {
+    box.innerHTML = '<div class="empty">No transactions yet. Record entries to build this statement.</div>';
+    return;
+  }
+
+  const { net: income } = computeIncome();
+  const ownerEquity = investment + income - withdrawal;
+  const totalAssets = assets.reduce((s, r) => s + r.bal, 0);
+  const totalLiab = liabilities.reduce((s, r) => s + r.bal, 0);
+  const totalLiabEquity = totalLiab + ownerEquity;
+
+  // The last item in a group gets a single underline before the total
+  const itemRows = list => list.map((r, i) => `
+    <tr>
+      <td class="nested">${esc(r.acct.name)}</td>
+      <td class="amt ${i === list.length - 1 ? 'single' : ''}">${signedMoney(r.bal)}</td>
+    </tr>`).join('');
+
+  box.innerHTML = `
+    <div class="statement">
+      ${stmtHeader('Statement of Financial Position')}
+      <table class="stmt-table">
+        <tbody>
+          <tr><td class="section">Assets</td><td class="amt"></td></tr>
+          ${itemRows(assets)}
+          <tr class="net-row">
+            <td>Total Assets</td>
+            <td class="amt double">${signedMoney(totalAssets)}</td>
+          </tr>
+
+          <tr><td class="section" style="padding-top:28px">Liabilities</td><td class="amt"></td></tr>
+          ${itemRows(liabilities)}
+          <tr class="total-row">
+            <td>Total Liabilities</td>
+            <td class="amt">${signedMoney(totalLiab)}</td>
+          </tr>
+
+          <tr><td class="section" style="padding-top:28px">Owner's Equity</td><td class="amt"></td></tr>
+          <tr>
+            <td class="nested">${OWNER_LABEL}, Capital</td>
+            <td class="amt single">${signedMoney(ownerEquity)}</td>
+          </tr>
+          <tr class="net-row">
+            <td>Total Liabilities &amp; Equity</td>
+            <td class="amt double">${signedMoney(totalLiabEquity)}</td>
           </tr>
         </tbody>
       </table>

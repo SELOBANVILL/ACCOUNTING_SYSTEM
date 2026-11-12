@@ -91,6 +91,7 @@ sb.auth.onAuthStateChange((_event, session) => {
     $('#auth-screen').classList.add('hidden');
     $('#app').classList.remove('hidden');
     $('#user-email').textContent = session.user.email;
+    setTimeout(() => $('.tab[data-view="dashboard"]').click(), 0);
     setTimeout(loadAll, 0);
   } else {
     state.accounts = []; state.entries = [];
@@ -145,6 +146,7 @@ function renderAll() {
   renderEquity();
   renderPosition();
   renderCashFlow();
+  renderDashboard();
   refreshSelects();
 }
 
@@ -778,6 +780,102 @@ function renderCashFlow() {
         </tbody>
       </table>
     </div>`;
+}
+
+/* =====================================================
+   DASHBOARD
+   ===================================================== */
+function renderDashboard() {
+  const peso = c => (c < 0 ? '-' : '') + '₱' + money(Math.abs(c));
+  const byId = new Map(state.accounts.map(a => [a.id, a]));
+
+  /* ---- A. Financial summary cards ---- */
+  // Same cash-account rule used in the cash flow statement
+  const isCash = a => a.type === 'Asset' && roleOf(a) === 'other' && /\bcash\b/i.test(a.name);
+  const cash = state.accounts.filter(isCash).reduce((s, a) => s + netDrCr(a.id), 0);
+  const { totalRev, totalExp, net } = computeIncome();
+
+  const stats = [
+    ['Cash Balance', cash],
+    ['Total Revenue', totalRev],
+    ['Total Expenses', totalExp],
+    [netLabel(net), net]
+  ];
+  $('#dash-cards').innerHTML = stats.map(([label, c]) => `
+    <div class="card dash-stat">
+      <span>${label}</span>
+      <strong class="${c < 0 ? 'loss' : ''}">${peso(c)}</strong>
+    </div>`).join('');
+
+  /* ---- B. Revenue vs. Expenses by month ---- */
+  const pie = $('#dash-chart');
+  const rev = Math.max(0, totalRev);
+  const exp = Math.max(0, totalExp);
+  const pieTotal = rev + exp;
+
+  if (pieTotal <= 0) {
+    pie.innerHTML = '<div class="empty">No revenue or expense activity yet.</div>';
+  } else {
+    const revPct = rev / pieTotal * 100;
+    const pct = v => (v / pieTotal * 100).toFixed(1) + '%';
+    pie.innerHTML = `
+      <div class="dash-pie"
+           style="background:conic-gradient(var(--maroon) 0 ${revPct}%, var(--black) ${revPct}% 100%)"
+           title="Revenue ${pct(rev)} / Expenses ${pct(exp)}"></div>
+      <div class="dash-pie-legend">
+        <div><i class="l-rev"></i><span>Revenue</span><strong>${peso(rev)}</strong><em>${pct(rev)}</em></div>
+        <div><i class="l-exp"></i><span>Expenses</span><strong>${peso(exp)}</strong><em>${pct(exp)}</em></div>
+      </div>`;
+  }
+
+  /* ---- C. Accounting overview ---- */
+  const nReg = state.entries.filter(e => e.kind === 'regular').length;
+  const nAdj = state.entries.filter(e => e.kind === 'adjusting').length;
+  $('#dash-overview').innerHTML = [
+    ['Total Chart of Accounts', state.accounts.length],
+    ['Total Business Transactions', nReg],
+    ['Total Adjusting Entries', nAdj]
+  ].map(([label, n]) => `
+    <div class="dash-ov"><span>${label}</span><strong>${n}</strong></div>`).join('');
+
+  /* ---- D. Recent transactions (latest 3 entries, journal and adjustments) ---- */
+  // state.entries is already sorted by entry date, then by time created
+  const recent = state.entries.slice(-3).reverse();
+  if (!recent.length) {
+    $('#dash-recent').innerHTML = '<div class="empty">No transactions recorded yet.</div>';
+  } else {
+    $('#dash-recent').innerHTML = `
+      <table>
+        <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="num">Amount</th></tr></thead>
+        <tbody>${recent.map(e => {
+          // Total of the debit side only; the credit side is the same amount
+          const total = e.journal_lines.reduce((s, l) => s + toCents(l.debit), 0);
+          const date = new Date(e.entry_date + 'T00:00:00')
+            .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          const isAdj = e.kind === 'adjusting';
+          return `<tr>
+            <td class="dash-date">${date}</td>
+            <td><span class="pill dash-kind ${isAdj ? 'adj' : ''}">${isAdj ? 'Adjustment' : 'Journal'}</span></td>
+            <td class="dash-desc">${esc(e.description)}</td>
+            <td class="num"><strong>${peso(total)}</strong></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+  }
+
+  /* ---- E. Trial balance status (adjusted columns) ---- */
+  const tb = computeTrial();
+  const dr = tb.reduce((s, r) => s + r.a.dr, 0);
+  const cr = tb.reduce((s, r) => s + r.a.cr, 0);
+  let badge;
+  if (!tb.length)    badge = '<span class="badge">No transactions yet</span>';
+  else if (dr === cr) badge = '<span class="badge ok">✓ Balanced</span>';
+  else               badge = `<span class="badge bad">Out of Balance by ${peso(Math.abs(dr - cr))}</span>`;
+
+  $('#dash-trial').innerHTML = `
+    <div class="dash-tb-badge">${badge}</div>
+    <div class="dash-tb-row"><span>Total Debits</span><strong>${peso(dr)}</strong></div>
+    <div class="dash-tb-row"><span>Total Credits</span><strong>${peso(cr)}</strong></div>`;
 }
 
 /* =====================================================

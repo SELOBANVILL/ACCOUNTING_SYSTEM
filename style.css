@@ -33,7 +33,7 @@ h3 { margin: 28px 0 12px; }
   display: grid;
   place-items: center;
   padding: 28px 16px;
-  background: #070b0e;
+  background: linear-gradient(black, maroon);
 }
 .login-shell {
   width: min(920px, 100%);
@@ -143,24 +143,50 @@ h3 { margin: 28px 0 12px; }
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 48px 42px 48px 86px;
+  padding: 48px 40px 48px 84px;
   background: linear-gradient(160deg, #e03d3d 0%, #a51a1a 42%, #7d0e0e 100%);
   clip-path: polygon(22% 0, 100% 0, 100% 100%, 0 100%);
+  font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
 }
-.login-right h2 {
-  margin: 0;
-  font-size: 38px;
-  line-height: 1.05;
-  font-weight: 800;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-.login-right p {
-  margin: 18px 0 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: rgba(255,255,255,.88);
+
+.welcome-small {
+  font-size: 12px;
   font-weight: 500;
+  letter-spacing: .35em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .85);
+}
+
+.login-right .brand-title {
+  margin: 10px 0 0;
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: .06em;
+  text-transform: none;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, .25);
+}
+
+.login-right .brand-tagline {
+  margin: 20px 0 0;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.75;
+  letter-spacing: .02em;
+  color: rgba(255, 255, 255, .92);
+}
+
+.login-right .brand-prompt {
+  margin: 44px 0 0;
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, .35);
+  max-width: 220px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.7;
+  letter-spacing: .05em;
+  color: rgba(255, 255, 255, .78);
 }
 
 .logo {
@@ -227,7 +253,7 @@ h3 { margin: 28px 0 12px; }
 .sidebar-toggle, .sidebar-backdrop { display: none; }
 
 /* ---------- Layout ---------- */
-.content { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; width: 100%; }
+.content { max-width: none; margin: 0; padding: 28px 20px 60px; width: 100%; min-width: 0; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 18px; }
 .card {
   background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
@@ -299,7 +325,7 @@ table.lines tfoot td { font-weight: 700; border-top: 2px solid var(--black); bor
 #tb-status { margin-bottom: 14px; }
 
 /* ---------- Financial statements ---------- */
-.statement-wrap { max-width: 720px; margin: 0 auto 18px; }
+.statement-wrap { max-width: 2000px; margin: 0 auto 18px; }
 .statement {
   font-family: 'Times New Roman', Times, serif;
   color: #111;
@@ -385,4 +411,145 @@ table.lines tfoot td { font-weight: 700; border-top: 2px solid var(--black); bor
   .sidebar-backdrop.show { display: block; }
   .content { padding-top: 64px; }
   .page-head { flex-direction: column; align-items: flex-start; }
+  .login-right .brand-title { font-size: 40px; }
+}
+
+/* ---------- Dashboard ---------- */
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: calc(100vh - 88px);   /* fits the screen: content padding is 28px top + 60px bottom */
+  min-height: 580px;
+}
+.dash .card { margin: 0; padding: 16px 18px; }
+.dash .page-head { margin-bottom: 0; }
+.dash h2 { font-size: 22px; }
+.dash h3 { margin: 0 0 10px; font-size: 15px; }
+
+/* summary cards */
+.dash-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.dash-stat { display: flex; flex-direction: column; gap: 6px; border-top: 3px solid var(--maroon); }
+.dash-stat span {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--gray);
+}
+.dash-stat strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+
+/* rows of panels */
+.dash-mid, .dash-bottom {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 14px;
+  min-height: 0;
+}
+.dash-mid { flex: 1.4; }
+.dash-bottom { flex: 1; }
+.dash-panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.dash-panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.dash-panel-head h3 { margin: 0; }
+
+/* chart (pie) */
+.dash-chart { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 32px; }
+.dash-chart .empty { margin: auto; }
+.dash-pie {
+  height: 80%;
+  max-height: 80%;
+  aspect-ratio: 1 / 1;
+  max-width: 45%;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0,0,0,.15);
+}
+.dash-pie-legend { display: flex; flex-direction: column; gap: 14px; }
+.dash-pie-legend > div { display: grid; grid-template-columns: 12px auto; column-gap: 8px; align-items: center; }
+.dash-pie-legend i { width: 12px; height: 12px; border-radius: 3px; grid-row: span 2; }
+.dash-pie-legend .l-rev { background: var(--maroon); }
+.dash-pie-legend .l-exp { background: var(--black); }
+.dash-pie-legend span { font-size: 12px; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: .05em; }
+.dash-pie-legend strong { font-size: 16px; font-variant-numeric: tabular-nums; grid-column: 2; }
+.dash-pie-legend em { font-style: normal; font-size: 12px; color: var(--gray); grid-column: 2; }
+
+/* accounting overview */
+.dash-ov {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--line);
+}
+.dash-ov:last-child { border-bottom: 0; }
+.dash-ov span { color: var(--gray); font-weight: 600; font-size: 13px; }
+.dash-ov strong { font-size: 20px; color: var(--maroon); }
+
+/* recent transactions */
+.dash table th, .dash table td { padding: 7px 10px; }
+.dash-date { white-space: nowrap; color: var(--gray); }
+.dash-desc { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-kind { white-space: nowrap; }
+.dash-kind.adj { background: var(--black); color: #fff; }
+
+/* trial balance status */
+.dash-tb-badge { margin-bottom: 8px; }
+.dash-tb-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums;
+}
+.dash-tb-row:last-child { border-bottom: 0; }
+.dash-tb-row span { color: var(--gray); font-weight: 600; font-size: 13px; }
+
+/* smaller screens */
+@media (max-width: 900px) {
+  .dash { height: auto; min-height: 0; }
+  .dash-cards { grid-template-columns: repeat(2, 1fr); }
+  .dash-mid, .dash-bottom { grid-template-columns: 1fr; grid-template-rows: auto; flex: none; }
+  .dash-chart { min-height: 240px; flex-wrap: wrap; }
+  .dash-pie { height: 200px; max-width: none; }
+}
+@media (max-width: 520px) {
+  .dash-cards { grid-template-columns: 1fr; }
+}
+
+/* ---------- Dashboard: use the full screen width (desktop only) ---------- */
+@media (min-width: 901px) {
+
+  .dash { gap: 18px; }
+  .dash-cards, .dash-mid, .dash-bottom { gap: 18px; }
+  .dash-mid, .dash-bottom { grid-template-columns: 1.7fr 1fr; }
+
+  /* bigger, roomier summary cards */
+  .dash-stat { padding: 20px 24px; gap: 8px; }
+  .dash-stat span { font-size: 13px; }
+  .dash-stat strong { font-size: 30px; }
+
+  .dash .card { padding: 20px 24px; }
+  .dash h3 { font-size: 17px; margin-bottom: 14px; }
+
+  /* chart: larger pie and legend */
+  .dash-chart { gap: 56px; }
+  .dash-pie-legend { gap: 22px; }
+  .dash-pie-legend span { font-size: 13px; }
+  .dash-pie-legend strong { font-size: 22px; }
+  .dash-pie-legend em { font-size: 13px; }
+
+  /* overview and trial balance: spread rows evenly to fill the card */
+  #dash-overview, #dash-trial {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .dash-ov, .dash-tb-row { flex: 1; padding: 0; }
+  .dash-ov span, .dash-tb-row span { font-size: 15px; }
+  .dash-ov strong { font-size: 34px; }
+  .dash-tb-row strong { font-size: 20px; }
+  .dash-tb-badge { margin-bottom: 12px; }
+  .dash-tb-badge .badge { font-size: 14px; padding: 7px 14px; }
+
+  /* recent transactions: roomier rows */
+  #dash-recent { flex: 1; min-height: 0; }
+  .dash table th { font-size: 12px; padding: 10px 14px; }
+  .dash table td { font-size: 15px; padding: 14px; }
+}
+
+/* ---------- All tabs: use the full screen width (desktop only) ---------- */
+@media (min-width: 901px) {
+  .content { padding-left: 32px; padding-right: 32px; }
 }

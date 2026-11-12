@@ -819,13 +819,13 @@ function renderDashboard() {
     const revPct = rev / pieTotal * 100;
     const pct = v => (v / pieTotal * 100).toFixed(1) + '%';
     pie.innerHTML = `
-      <div class="dash-pie"
-           style="background:conic-gradient(var(--maroon) 0 ${revPct}%, var(--black) ${revPct}% 100%)"
-           title="Revenue ${pct(rev)} / Expenses ${pct(exp)}"></div>
-      <div class="dash-pie-legend">
-        <div><i class="l-rev"></i><span>Revenue</span><strong>${peso(rev)}</strong><em>${pct(rev)}</em></div>
-        <div><i class="l-exp"></i><span>Expenses</span><strong>${peso(exp)}</strong><em>${pct(exp)}</em></div>
-      </div>`;
+  <div class="dash-pie"
+       style="background:conic-gradient(#ffee00 0 ${revPct}%, #000000 ${revPct}% 100%)"
+       title="Revenue ${pct(rev)} / Expenses ${pct(exp)}"></div>
+  <div class="dash-pie-legend">
+    <div><i class="l-rev"></i><span>Revenue</span><strong>${peso(rev)}</strong><em>${pct(rev)}</em></div>
+    <div><i class="l-exp"></i><span>Expenses</span><strong>${peso(exp)}</strong><em>${pct(exp)}</em></div>
+  </div>`;
   }
 
   /* ---- C. Accounting overview ---- */

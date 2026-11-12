@@ -144,6 +144,7 @@ function renderAll() {
   renderIncome();
   renderEquity();
   renderPosition();
+  renderCashFlow();
   refreshSelects();
 }
 
@@ -662,6 +663,123 @@ function renderPosition() {
       </table>
     </div>`;
 }
+
+function renderCashFlow() {
+  const box = $('#cashflow-report');
+
+  const isCash = a => a.type === 'Asset' && roleOf(a) === 'other' && /\bcash\b/i.test(a.name);
+  const byId = new Map(state.accounts.map(a => [a.id, a]));
+
+  let receipts = 0, suppliers = 0, salaries = 0;
+  const investing = new Map();   // account name -> cash effect
+  const financing = new Map();
+  const bump = (map, key, c) => map.set(key, (map.get(key) || 0) + c);
+  let touched = false;
+
+  for (const entry of state.entries) {
+    // Only entries that touch a cash account affect this statement
+    const hasCash = entry.journal_lines.some(l => {
+      const a = byId.get(l.account_id);
+      return a && isCash(a);
+    });
+    if (!hasCash) continue;
+    touched = true;
+
+    // Every non-cash line explains part of the cash movement:
+    // a credit to it means cash came in, a debit means cash went out.
+    for (const l of entry.journal_lines) {
+      const acct = byId.get(l.account_id);
+      if (!acct || isCash(acct)) continue;
+      const c = toCents(l.credit) - toCents(l.debit);
+      if (!c) continue;
+
+      const role = roleOf(acct);
+      const n = acct.name;
+
+      if (role === 'drawings') bump(financing, "Owner's withdrawal", c);
+      else if (role === 'capital') bump(financing, 'Investment by owner', c);
+      else if (acct.type === 'Liability' && /loan|note|mortgage|bond/i.test(n)) bump(financing, n, c);
+      else if (role === 'contra-asset' ||
+               (acct.type === 'Asset' && /equipment|furniture|fixture|building|land|vehicle|machinery|property|computer/i.test(n)))
+        bump(investing, n, c);
+      else if (role === 'revenue' || /receivable|unearned/i.test(n)) receipts += c;
+      else if (/salar|wage/i.test(n)) salaries += c;
+      else suppliers += c;   // other expenses, payables, supplies, etc.
+    }
+  }
+
+  if (!touched) {
+    box.innerHTML = '<div class="empty">No cash transactions yet. Record entries that involve a cash account.</div>';
+    return;
+  }
+
+  const sumMap = m => [...m.values()].reduce((s, v) => s + v, 0);
+  const payments = [];
+  if (suppliers) payments.push({ label: 'Cash paid to suppliers', bal: suppliers });
+  if (salaries)  payments.push({ label: 'Cash paid for salaries', bal: salaries });
+  if (!payments.length) payments.push({ label: 'None', bal: 0 });
+  const totalPay = suppliers + salaries;
+
+  const operating = receipts + totalPay;
+  const invTotal = sumMap(investing);
+  const finTotal = sumMap(financing);
+  const netChange = operating + invTotal + finTotal;
+  const { to } = entryRange();
+
+  const E = '<td class="amt"></td>';   // empty amount cell
+
+  const payRows = payments.map((p, i) => {
+    const last = i === payments.length - 1;
+    return `
+      <tr>
+        <td class="nested">${p.label}</td>
+        <td class="amt ${last ? 'single' : ''}">${signedMoney(p.bal)}</td>
+        ${last ? `<td class="amt single">${signedMoney(totalPay)}</td>` : E}
+        ${E}
+      </tr>`;
+  }).join('');
+
+  const invLabel = (name, c) => (c < 0 ? 'Cash paid for ' : 'Cash received from ') + esc(name.toLowerCase());
+  const invList = [...investing].filter(([, c]) => c);
+  const invRows = !invList.length
+    ? `<tr><td class="nested">None</td>${E}${E}<td class="amt">0.00</td></tr>`
+    : invList.length === 1
+      ? `<tr><td class="nested">${invLabel(invList[0][0], invList[0][1])}</td>${E}${E}<td class="amt">${signedMoney(invList[0][1])}</td></tr>`
+      : invList.map(([name, c], i) => `
+          <tr><td class="nested">${invLabel(name, c)}</td>
+          <td class="amt ${i === invList.length - 1 ? 'single' : ''}">${signedMoney(c)}</td>${E}${E}</tr>`).join('') + `
+          <tr class="total-row"><td>Net cash from investing activities</td>${E}${E}<td class="amt">${signedMoney(invTotal)}</td></tr>`;
+
+  const finList = [...financing].filter(([, c]) => c);
+  const finRows = (finList.length ? finList : [['None', 0]]).map(([name, c], i, arr) => `
+    <tr><td class="nested">${esc(name)}</td>
+    <td class="amt ${i === arr.length - 1 ? 'single' : ''}">${signedMoney(c)}</td>${E}${E}</tr>`).join('');
+
+  box.innerHTML = `
+    <div class="statement">
+      ${stmtHeader('Statement of Cash Flows')}
+      <table class="stmt-table">
+        <tbody>
+          <tr><td class="section">Cash from Operating Activities</td>${E}${E}${E}</tr>
+          <tr><td class="section" style="padding-top:4px">Cash Receipts</td>${E}${E}${E}</tr>
+          <tr><td class="nested">Cash receipts from customers</td>${E}<td class="amt">${signedMoney(receipts)}</td>${E}</tr>
+          <tr><td class="section">Cash Payments</td>${E}${E}${E}</tr>
+          ${payRows}
+          <tr class="total-row"><td>Net cash from operating activities</td>${E}${E}<td class="amt">${signedMoney(operating)}</td></tr>
+
+          <tr><td class="section" style="padding-top:28px">Cash from Investing Activities</td>${E}${E}${E}</tr>
+          ${invRows}
+
+          <tr><td class="section" style="padding-top:28px">Cash from Financing Activities</td>${E}${E}${E}</tr>
+          ${finRows}
+          <tr class="total-row"><td>Net cash from financing activities</td>${E}${E}<td class="amt single">${signedMoney(finTotal)}</td></tr>
+
+          <tr class="net-row"><td>Cash Balance, ${esc(longDate(to))}</td>${E}${E}<td class="amt double">${signedMoney(netChange)}</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
 /* =====================================================
    10. START
    ===================================================== */

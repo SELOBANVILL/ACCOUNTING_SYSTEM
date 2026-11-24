@@ -362,7 +362,7 @@ function renderEntries(kind) {
 });
 
 /* =====================================================
-   8. TRIAL BALANCE (all entries, no date filter)
+   8. TRIAL BALANCE (all entries)
    ===================================================== */
 function computeTrial() {
   const rows = new Map(state.accounts.map(a =>
@@ -458,7 +458,7 @@ function roleOf(acct) {
   return 'other';
 }
 
-// First and last entry dates, so headings follow your records (e.g. Dec 1 to Dec 31, 2024)
+// First and last entry dates, so headings follow current records 
 function entryRange() {
   const dates = state.entries.map(e => e.entry_date).sort();
   return dates.length

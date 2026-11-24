@@ -842,63 +842,172 @@ table.lines tfoot td { font-weight: 700; border-top: 2px solid var(--black); bor
 }
 
 /* ==========================================
-   MOBILE FIXES (add at the very bottom)
+   MOBILE FIT (no sideways scrolling)
    ========================================== */
 @media (max-width: 900px) {
 
-  /* Stop wide tables from stretching the whole page */
   html, body { overflow-x: hidden; }
   .app-shell { grid-template-columns: minmax(0, 1fr); }
-  .content { padding: 64px 14px 40px; min-width: 0; }
+  .content { padding: 64px 12px 40px; min-width: 0; }
 
-  /* Sidebar: full height on mobile browsers and scrollable */
-  .sidebar {
-    height: 100vh;
-    height: 100dvh;
-    overflow-y: auto;
-  }
+  .sidebar { height: 100vh; height: 100dvh; overflow-y: auto; }
 
-  /* Cards scroll sideways instead of squeezing their tables */
-  .card { overflow-x: auto; padding: 16px; }
+  /* Cards fit the screen, no sideways scroll */
+  .card, .card.scroll { overflow-x: visible; padding: 14px; }
   .card::after { width: 100%; }
-  .statement-wrap { overflow-x: auto; }
 
-  /* Prevent iOS auto-zoom on inputs */
+  /* Inputs: no iPhone zoom */
   input, select { font-size: 16px; }
 
-  /* Forms: stack fields full width */
+  /* Forms stack full width */
   .row { gap: 12px; }
-  .row > label,
-  .row > .btn { flex: 1 1 100%; min-width: 0; }
+  .row > label, .row > .btn { flex: 1 1 100%; min-width: 0; }
   .grow { min-width: 0; }
   label.check { padding-bottom: 0; }
   .btn { padding: 12px 18px; }
 
-  /* Journal / adjustment line tables: keep readable, scroll sideways */
-  table.lines { min-width: 620px; }
-  table.lines th { width: auto !important; }
-  .card > table { min-width: 520px; }
+  /* ---------- Chart of Accounts table ---------- */
+  #view-accounts table { table-layout: auto; }
+  #view-accounts th, #view-accounts td { padding: 8px 4px; font-size: 12px; }
+  #view-accounts th { letter-spacing: 0; }
+  #view-accounts .pill { font-size: 11px; padding: 2px 8px; }
+  #view-accounts .btn.danger { padding: 5px 8px; font-size: 12px; }
+
+  /* ---------- Journal / Adjustment ENTRY FORM ----------
+     Each line becomes a small block:
+     Account on top, Debit and Credit side by side, then the ✕ button */
+  table.lines, table.lines tbody, table.lines tfoot {
+    display: block; width: 100%; min-width: 0;
+  }
+  table.lines thead { display: none; }
+
+  table.lines tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    align-items: end;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+  }
+  table.lines tbody td { display: block; padding: 0; border: 0; }
+  table.lines tbody td:first-child { grid-column: 1 / -1; }
+  table.lines tbody td:nth-child(2)::before,
+  table.lines tbody td:nth-child(3)::before {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #e0d0d4;
+    margin-bottom: 4px;
+  }
+  table.lines tbody td:nth-child(2)::before { content: "Debit"; }
+  table.lines tbody td:nth-child(3)::before { content: "Credit"; }
+
+  table.lines tfoot tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 10px 0 0;
+    border-top: 2px solid #fff;
+  }
+  table.lines tfoot td { padding: 0; border: 0; font-size: 13px; }
+  table.lines tfoot td:last-child { display: none; }
+
   .entry-head { flex-direction: column; align-items: flex-start; }
 
-  /* Trial balance */
-  #tb-table { min-width: 700px; }
+  /* ---------- Recorded entries (Account / Debit / Credit) ---------- */
+  .card > table:not(.lines) { table-layout: fixed; width: 100%; min-width: 0; }
+  .card > table:not(.lines) th,
+  .card > table:not(.lines) td {
+    padding: 8px 4px;
+    font-size: 13px;
+    word-break: break-word;
+  }
+  .card > table:not(.lines) th.num { width: 92px !important; }
+  .card > table:not(.lines) td.indent { padding-left: 16px; }
 
-  /* Financial statements */
-  .statement-wrap .statement { padding: 14px; min-width: 520px; }
-  .stmt-header h2 { font-size: 18px; }
-  .stmt-header h3 { font-size: 16px; }
-  .stmt-table td { font-size: 13px; padding: 5px 4px; }
-  .stmt-table .amt { width: 96px; }
-  .stmt-table .nested { padding-left: 16px; }
+  /* ---------- Trial Balance: each account becomes a small block ---------- */
+  #tb-table, #tb-table tbody, #tb-table tfoot { display: block; width: 100%; min-width: 0; }
+  #tb-table thead { display: none; }
 
-  /* Dashboard */
-  .dash-panel { overflow-x: auto; }
-  .dash table { min-width: 460px; }
+  #tb-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+  }
+  #tb-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    font-size: 13px;
+  }
+  #tb-table td:first-child {
+    grid-column: 1 / -1;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  #tb-table td:empty { display: none; }       /* hide blank cells */
+  #tb-table td:not(:first-child)::before {
+    font-size: 11px;
+    color: #e0d0d4;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  #tb-table td:nth-child(2)::before { content: "Unadj. Dr"; }
+  #tb-table td:nth-child(3)::before { content: "Unadj. Cr"; }
+  #tb-table td:nth-child(4)::before { content: "Adj. Dr"; }
+  #tb-table td:nth-child(5)::before { content: "Adj. Cr"; }
+  #tb-table td:nth-child(6)::before { content: "Final Dr"; }
+  #tb-table td:nth-child(7)::before { content: "Final Cr"; }
+
+  /* Total row */
+  #tb-table tfoot tr {
+    background: linear-gradient(135deg, #7A0F26, #3A0A17, #111111);
+    border-bottom: 4px double #FFD700;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+  }
+  #tb-table tfoot td {
+    background: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+    font-size: 13px;
+  }
+  #tb-table tfoot td:first-child { font-size: 15px; }
+
+  /* ---------- Financial statements (fit the screen) ---------- */
+  .statement-wrap { padding: 10px; }
+  .statement-wrap .statement { padding: 10px; min-width: 0; }
+  .stmt-header { margin-bottom: 14px; }
+  .stmt-header h2 { font-size: 17px; }
+  .stmt-header h3 { font-size: 15px; }
+  .stmt-header p { font-size: 13px; }
+  .stmt-table { table-layout: auto; width: 100%; }
+  .stmt-table td { font-size: 12px; padding: 4px 3px; }
+  .stmt-table .amt {
+    width: 1%;              /* shrink to fit the number */
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .stmt-table .nested { padding-left: 12px; }
+
+  /* ---------- Dashboard ---------- */
   .dash-stat strong { font-size: 20px; }
-  .dash-chart { gap: 20px; }
+  .dash-chart { gap: 20px; flex-wrap: wrap; }
   .dash-pie { width: 200px; height: 200px; max-width: none; max-height: none; }
+  .dash table { table-layout: fixed; width: 100%; min-width: 0; }
+  .dash table th, .dash table td { padding: 8px 4px; font-size: 12px; }
+  .dash table th:nth-child(1) { width: 78px; }
+  .dash table th:nth-child(2),
+  .dash table td:nth-child(2) { display: none; }   /* hide the Type column on phones */
+  .dash table th:nth-child(4) { width: 92px; }
+  .dash-desc { max-width: none; }
 
-  /* Toast */
   .toast { max-width: 90vw; text-align: center; }
 }
 
@@ -915,10 +1024,7 @@ table.lines tfoot td { font-weight: 700; border-top: 2px solid var(--black); bor
   .login-right .brand-title { font-size: 28px; }
   .login-right .brand-prompt { margin-top: 22px; padding-top: 14px; max-width: none; }
 
-  /* Headings */
   h2 { font-size: 20px; }
   .page-head { margin-bottom: 12px; }
-
-  /* Dashboard summary cards: one per row */
   .dash-cards { grid-template-columns: 1fr; }
 }

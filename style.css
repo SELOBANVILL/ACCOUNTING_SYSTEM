@@ -840,3 +840,85 @@ table.lines tfoot td { font-weight: 700; border-top: 2px solid var(--black); bor
 #tb-table tfoot tr:hover {
   background: transparent !important;
 }
+
+/* ==========================================
+   MOBILE FIXES (add at the very bottom)
+   ========================================== */
+@media (max-width: 900px) {
+
+  /* Stop wide tables from stretching the whole page */
+  html, body { overflow-x: hidden; }
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .content { padding: 64px 14px 40px; min-width: 0; }
+
+  /* Sidebar: full height on mobile browsers and scrollable */
+  .sidebar {
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+  }
+
+  /* Cards scroll sideways instead of squeezing their tables */
+  .card { overflow-x: auto; padding: 16px; }
+  .card::after { width: 100%; }
+  .statement-wrap { overflow-x: auto; }
+
+  /* Prevent iOS auto-zoom on inputs */
+  input, select { font-size: 16px; }
+
+  /* Forms: stack fields full width */
+  .row { gap: 12px; }
+  .row > label,
+  .row > .btn { flex: 1 1 100%; min-width: 0; }
+  .grow { min-width: 0; }
+  label.check { padding-bottom: 0; }
+  .btn { padding: 12px 18px; }
+
+  /* Journal / adjustment line tables: keep readable, scroll sideways */
+  table.lines { min-width: 620px; }
+  table.lines th { width: auto !important; }
+  .card > table { min-width: 520px; }
+  .entry-head { flex-direction: column; align-items: flex-start; }
+
+  /* Trial balance */
+  #tb-table { min-width: 700px; }
+
+  /* Financial statements */
+  .statement-wrap .statement { padding: 14px; min-width: 520px; }
+  .stmt-header h2 { font-size: 18px; }
+  .stmt-header h3 { font-size: 16px; }
+  .stmt-table td { font-size: 13px; padding: 5px 4px; }
+  .stmt-table .amt { width: 96px; }
+  .stmt-table .nested { padding-left: 16px; }
+
+  /* Dashboard */
+  .dash-panel { overflow-x: auto; }
+  .dash table { min-width: 460px; }
+  .dash-stat strong { font-size: 20px; }
+  .dash-chart { gap: 20px; }
+  .dash-pie { width: 200px; height: 200px; max-width: none; max-height: none; }
+
+  /* Toast */
+  .toast { max-width: 90vw; text-align: center; }
+}
+
+@media (max-width: 520px) {
+
+  /* Login screen */
+  .auth-screen { padding: 16px 10px; }
+  .login-shell { padding: 6px; border-radius: 22px; }
+  .login-box { border-radius: 18px; }
+  .login-left { padding: 28px 22px 26px; }
+  .login-left h1 { font-size: 28px; margin-bottom: 26px; }
+  .underline-field input { font-size: 16px; }
+  .login-right { min-height: 0; padding: 26px 22px; }
+  .login-right .brand-title { font-size: 28px; }
+  .login-right .brand-prompt { margin-top: 22px; padding-top: 14px; max-width: none; }
+
+  /* Headings */
+  h2 { font-size: 20px; }
+  .page-head { margin-bottom: 12px; }
+
+  /* Dashboard summary cards: one per row */
+  .dash-cards { grid-template-columns: 1fr; }
+}

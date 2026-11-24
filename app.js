@@ -79,6 +79,21 @@ $('#signup-btn').addEventListener('click', async () => {
   if (!data.session) authMsg('Account created. Check your email to confirm, then log in.', true);
 });
 
+// Show / hide password (only when the lock icon is clicked)
+const pwInput = $('#password');
+const pwToggle = $('#toggle-password');
+
+function setPasswordVisible(show) {
+  pwInput.type = show ? 'text' : 'password';
+  pwToggle.classList.toggle('showing', show);
+  pwToggle.setAttribute('aria-pressed', String(show));
+  pwToggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+}
+
+pwToggle.addEventListener('click', () => {
+  setPasswordVisible(pwInput.type === 'password');
+});
+
 $('#logout-btn').addEventListener('click', () => sb.auth.signOut());
 
 let currentUserId = null;
@@ -98,6 +113,7 @@ sb.auth.onAuthStateChange((_event, session) => {
     $('#app').classList.add('hidden');
     $('#auth-screen').classList.remove('hidden');
     $('#password').value = '';
+    setPasswordVisible(false); 
   }
 });
 

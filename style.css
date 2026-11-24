@@ -146,9 +146,10 @@ h3 { margin: 28px 0 12px; }
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 48px 40px 48px 84px;
+  margin-left: -30px;                /* <-- add: pulls the line left */
+  padding: 48px 40px 48px 114px;  
   background: linear-gradient(160deg, #e03d3d 0%, #a51a1a 42%, #7d0e0e 100%);
-  clip-path: polygon(22% 0, 100% 0, 100% 100%, 0 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 23% 100%);
   font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
 }
 
@@ -163,7 +164,7 @@ h3 { margin: 28px 0 12px; }
 .login-right .brand-title {
   margin: 10px 0 0;
   font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  font-size: 34px;
+  font-size: 45px;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: .06em;
@@ -182,7 +183,7 @@ h3 { margin: 28px 0 12px; }
 
 .login-right .brand-prompt {
   margin: 44px 0 0;
-  padding-top: 22px;
+  padding-top: 15px;
   border-top: 1px solid rgba(255, 255, 255, .35);
   max-width: 220px;
   font-size: 12px;
@@ -425,6 +426,7 @@ table.lines tfoot td { font-weight: 700; border-top: 2px solid var(--black); bor
   .login-box { grid-template-columns: 1fr; min-height: 0; }
   .login-right {
     clip-path: none;
+    margin-left: 0;
     min-height: 180px;
     padding: 32px 28px;
     order: -1;
@@ -1027,4 +1029,80 @@ table.lines tfoot td { font-weight: 700; border-top: 2px solid var(--black); bor
   h2 { font-size: 20px; }
   .page-head { margin-bottom: 12px; }
   .dash-cards { grid-template-columns: 1fr; }
+}
+
+/* ==========================================
+   SHOW / HIDE PASSWORD BUTTON
+   ========================================== */
+.icon-toggle {
+  background: none;
+  border: 0;
+  padding: 6px;
+  right: -4px;
+  top: 0;
+  line-height: 0;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.icon-toggle:hover,
+.icon-toggle:focus-visible {
+  outline: none;
+  background: rgba(255, 251, 0, 0.15);
+}
+.icon-toggle .icon-open { display: none; }
+.icon-toggle.showing .icon-open { display: block; }
+.icon-toggle.showing .icon-locked { display: none; }
+
+/* ==========================================
+   LOGIN RIGHT PANEL: TEXT TRACES THE DIAGONAL
+   ========================================== */
+.login-right .ln { display: block; }
+.login-right .rule { display: none; }   /* dividers only on desktop */
+.login-right .press {
+  font-size: 12px;
+  letter-spacing: .05em;
+  color: rgba(255, 255, 255, .78);
+  margin-top: 16px;
+}
+
+@media (min-width: 901px) {
+
+  .login-right {
+    --slant: 22%;   /* must match the % in your clip-path */
+    --gap: 30px;    /* distance between the diagonal and the text */
+    padding: 0;
+  }
+
+  /* Let each line be positioned on its own */
+  .login-right .brand-tagline,
+  .login-right .brand-prompt { display: contents; }
+
+  .login-right .welcome-small,
+  .login-right .brand-title,
+  .login-right .ln {
+    position: absolute;
+    margin: 0;
+    white-space: nowrap;
+    top: calc(var(--f) * 100%);
+    left: calc(var(--slant) * var(--f) + var(--gap));
+  }
+
+  /* --f = how far down the panel the line sits (0 = top, 1 = bottom) */
+  .login-right .welcome-small { --f: 0.17; }
+  .login-right .brand-title   { --f: 0.22; }
+  .login-right .t1            { --f: 0.36; }
+  .login-right .t2            { --f: 0.41; }
+  .login-right .r1            { --f: 0.51; }
+  .login-right .p1            { --f: 0.54; }
+  .login-right .p2            { --f: 0.59; }
+  .login-right .r2            { --f: 0.71; }
+  .login-right .press         { --f: 0.75; }
+
+  /* Divider lines */
+  .login-right .rule {
+    display: block;
+    width: 220px;
+    height: 1px;
+    background: rgba(255, 255, 255, .35);
+  }
 }

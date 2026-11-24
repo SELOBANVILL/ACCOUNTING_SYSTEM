@@ -29,11 +29,16 @@
 
           <div class="underline-field">
             <input type="password" id="password" required minlength="6" autocomplete="current-password" placeholder="Password">
-            <span class="field-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+            <button type="button" id="toggle-password" class="field-icon icon-toggle" aria-label="Show password" aria-pressed="false">
+              <!-- closed lock: password hidden -->
+              <svg class="icon-locked" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
                 <rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
               </svg>
-            </span>
+              <!-- open lock: password visible -->
+              <svg class="icon-open" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.6-1.6"/>
+              </svg>
+            </button>
           </div>
 
           <p id="auth-msg" class="auth-msg"></p>
@@ -41,14 +46,25 @@
           <p class="signup-line">Don't have an account? <button type="button" id="signup-btn">Signup</button></p>
         </div>
 
-        <div class="login-right">
-          <span class="welcome-small">Welcome to</span>
-          <h2 class="brand-title">ACCUBALANCE</h2>
-          <p class="brand-tagline">Accuracy in every account.<br>Balance in every transaction.</p>
-          <p class="brand-prompt">Enter your credentials to<br>access your account.</p>
-        </div>
-      </form>
-    </div>
+          <div class="login-right">
+            <span class="welcome-small">Welcome to</span>
+            <h2 class="brand-title">ACCUBALANCE</h2>
+
+            <p class="brand-tagline">
+              <span class="ln t1">Accuracy in every account.</span>
+              <span class="ln t2">Balance in every transaction.</span>
+            </p>
+
+            <span class="ln rule r1"></span>
+
+            <p class="brand-prompt">
+              <span class="ln p1">Enter your credentials to</span>
+              <span class="ln p2">access your account.</span>
+            </p>
+
+            <span class="ln rule r2"></span>
+            <span class="ln press">Press sign in if no account.</span>
+          </div>
   </section>
 
   <!-- ============ MAIN APP ============ -->

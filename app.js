@@ -181,8 +181,20 @@ function renderAccounts() {
       <td>${esc(a.name)}</td>
       <td><span class="pill">${a.type}</span></td>
       <td>${a.normal_balance === 'debit' ? 'Debit' : 'Credit'}</td>
-      <td class="num"><button class="btn danger" data-del-acc="${a.id}">Delete</button></td>
+      <td class="num">
+        <button class="btn ghost" data-edit-acc="${a.id}">Edit</button>
+        <button class="btn danger" data-del-acc="${a.id}">Delete</button>
+      </td>
     </tr>`).join('');
+}
+
+let editingAccId = null;
+
+function resetAccountForm() {
+  editingAccId = null;
+  $('#account-form').reset();
+  $('#acc-submit').textContent = 'Add account';
+  $('#acc-cancel').classList.add('hidden');
 }
 
 $('#account-form').addEventListener('submit', async e => {
@@ -192,15 +204,23 @@ $('#account-form').addEventListener('submit', async e => {
   let normal = NORMAL[type];
   if (contra) normal = normal === 'debit' ? 'credit' : 'debit';
 
-  const { error } = await sb.from('accounts').insert({
+  const payload = {
     code: $('#acc-code').value.trim(), name: $('#acc-name').value.trim(),
     type, normal_balance: normal
-  });
+  };
+
+  const wasEditing = !!editingAccId;
+  const { error } = wasEditing
+    ? await sb.from('accounts').update(payload).eq('id', editingAccId)
+    : await sb.from('accounts').insert(payload);
+
   if (error) return toast(error.code === '23505' ? 'That account code already exists.' : error.message, true);
-  e.target.reset();
-  toast('Account added');
+  resetAccountForm();
+  toast(wasEditing ? 'Account updated' : 'Account added');
   loadAll();
 });
+
+$('#acc-cancel').addEventListener('click', resetAccountForm);
 
 $('#accounts-body').addEventListener('click', async e => {
   const id = e.target.dataset.delAcc;
@@ -210,6 +230,21 @@ $('#accounts-body').addEventListener('click', async e => {
     ? 'This account is used in journal entries and cannot be deleted.' : error.message, true);
   toast('Account deleted');
   loadAll();
+});
+
+$('#accounts-body').addEventListener('click', e => {
+  const id = e.target.dataset.editAcc;
+  if (!id) return;
+  const a = state.accounts.find(x => String(x.id) === id);
+  if (!a) return;
+  editingAccId = a.id;
+  $('#acc-code').value = a.code;
+  $('#acc-name').value = a.name;
+  $('#acc-type').value = a.type;
+  $('#acc-contra').checked = isContra(a);
+  $('#acc-submit').textContent = 'Save changes';
+  $('#acc-cancel').classList.remove('hidden');
+  $('#account-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 
 /* =====================================================
@@ -222,6 +257,8 @@ function fillSelect(sel) {
   sel.value = keep;
 }
 function refreshSelects() { document.querySelectorAll('.acct-select').forEach(fillSelect); }
+
+const entryForms = {};   // lets the Edit buttons reach each form
 
 function buildEntryForm(kind) {
   const root = $(kind === 'regular' ? '#journal-form' : '#adjust-form');
@@ -243,9 +280,13 @@ function buildEntryForm(kind) {
       <button type="button" class="btn ghost e-add">+ Add line</button>
       <span class="badge e-status">Enter amounts</span>
     </div>
-    <div style="margin-top:16px"><button type="button" class="btn primary e-save">Save entry</button></div>`;
+    <div class="row" style="margin-top:16px">
+      <button type="button" class="btn primary e-save">Save entry</button>
+      <button type="button" class="btn ghost e-cancel hidden">Cancel edit</button>
+    </div>`;
 
   const linesBody = $('.e-lines', root);
+  let editingId = null;   // set while you are editing an existing entry
 
   function updateTotals() {
     let dr = 0, cr = 0;
@@ -280,45 +321,78 @@ function buildEntryForm(kind) {
     linesBody.appendChild(tr);
   }
 
-  function reset() {
+    function reset() {
+    editingId = null;
     $('.e-date', root).value = todayStr();
     $('.e-desc', root).value = '';
     linesBody.innerHTML = '';
     addLine(); addLine();
     updateTotals();
+    $('.e-save', root).textContent = 'Save entry';
+    $('.e-cancel', root).classList.add('hidden');
   }
 
+  function load(entry) {
+    editingId = entry.id;
+    $('.e-date', root).value = entry.entry_date;
+    $('.e-desc', root).value = entry.description;
+    linesBody.innerHTML = '';
+    [...entry.journal_lines]
+      .sort((a, b) => (b.debit > 0) - (a.debit > 0))
+      .forEach(l => {
+        addLine();
+        const tr = linesBody.lastElementChild;
+        $('.acct-select', tr).value = l.account_id;
+        if (l.debit > 0) $('.dr', tr).value = (toCents(l.debit) / 100).toFixed(2);
+        if (l.credit > 0) $('.cr', tr).value = (toCents(l.credit) / 100).toFixed(2);
+      });
+    while (linesBody.children.length < 2) addLine();
+    updateTotals();
+    $('.e-save', root).textContent = 'Update entry';
+    $('.e-cancel', root).classList.remove('hidden');
+    root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  $('.e-cancel', root).addEventListener('click', reset);
   $('.e-add', root).addEventListener('click', addLine);
 
-  $('.e-save', root).addEventListener('click', async () => {
-    const date = $('.e-date', root).value;
-    const desc = $('.e-desc', root).value.trim();
-    if (!date) return toast('Please choose a date.', true);
-    if (!desc) return toast('Please enter a description.', true);
+$('.e-save', root).addEventListener('click', async () => {
+  const date = $('.e-date', root).value;
+  const desc = $('.e-desc', root).value.trim();
+  if (!date) return toast('Please choose a date.', true);
+  if (!desc) return toast('Please enter a description.', true);
 
-    const lines = [];
-    for (const tr of linesBody.querySelectorAll('tr')) {
-      const acct = $('.acct-select', tr).value;
-      const dr = toCents($('.dr', tr).value), cr = toCents($('.cr', tr).value);
-      if (!acct && !dr && !cr) continue;
-      if (!acct) return toast('Every line with an amount needs an account.', true);
-      if (!dr && !cr) return toast('Every selected account needs a debit or credit amount.', true);
-      lines.push({ account_id: acct, debit: dr / 100, credit: cr / 100 });
-    }
-    if (lines.length < 2) return toast('An entry needs at least two lines.', true);
-    const { dr, cr } = updateTotals();
-    if (dr !== cr) return toast('Debits must equal credits before saving.', true);
+  const lines = [];
+  for (const tr of linesBody.querySelectorAll('tr')) {
+    const acct = $('.acct-select', tr).value;
+    const dr = toCents($('.dr', tr).value), cr = toCents($('.cr', tr).value);
+    if (!acct && !dr && !cr) continue;                       // skip blank rows
+    if (!acct) return toast('Every line with an amount needs an account.', true);
+    if (!dr && !cr) return toast('Every line needs a debit or credit.', true);
+    lines.push({ account_id: acct, debit: dr / 100, credit: cr / 100 });
+  }
+  if (lines.length < 2) return toast('An entry needs at least two lines.', true);
+  const { dr, cr } = updateTotals();
+  if (dr !== cr) return toast('Debits must equal credits.', true);
 
-    const { error } = await sb.rpc('save_entry', {
-      p_date: date, p_description: desc, p_kind: kind, p_lines: lines
-    });
-    if (error) return toast(error.message, true);
-    toast(kind === 'regular' ? 'Journal entry saved' : 'Adjusting entry saved');
-    reset();
-    loadAll();
+  const wasEditing = editingId;
+  const { error } = await sb.rpc('save_entry', {
+    p_date: date, p_description: desc, p_kind: kind, p_lines: lines
   });
+  if (error) return toast(error.message, true);
 
+  if (wasEditing) {
+    const del = await sb.from('journal_entries').delete().eq('id', wasEditing);
+    if (del.error) { reset(); loadAll();
+      return toast('Updated version saved, but the old copy could not be deleted.', true); }
+  }
+  toast(wasEditing ? 'Entry updated' : kind === 'regular' ? 'Journal entry saved' : 'Adjusting entry saved');
   reset();
+  loadAll();
+});
+
+  reset();   // start with a date and two blank lines
+  entryForms[kind] = { load };
 }
 
 function renderEntries(kind) {
@@ -340,7 +414,10 @@ function renderEntries(kind) {
       <div class="card">
         <div class="entry-head">
           <div><span class="date">${e.entry_date}</span> &nbsp; ${esc(e.description)}</div>
-          <button class="btn danger" data-del-entry="${e.id}">Delete</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn ghost" data-edit-entry="${e.id}">Edit</button>
+            <button class="btn danger" data-del-entry="${e.id}">Delete</button>
+          </div>
         </div>
         <table>
           <thead><tr><th>Account</th><th class="num" style="width:160px">Debit</th><th class="num" style="width:160px">Credit</th></tr></thead>
@@ -361,8 +438,17 @@ function renderEntries(kind) {
   });
 });
 
+[['#journal-list', 'regular'], ['#adjust-list', 'adjusting']].forEach(([sel, kind]) => {
+  $(sel).addEventListener('click', e => {
+    const id = e.target.dataset.editEntry;
+    if (!id) return;
+    const entry = state.entries.find(x => String(x.id) === id);
+    if (entry) entryForms[kind].load(entry);
+  });
+});
+
 /* =====================================================
-   8. TRIAL BALANCE (all entries)
+   8. TRIAL BALANCE (all entries, no date filter)
    ===================================================== */
 function computeTrial() {
   const rows = new Map(state.accounts.map(a =>
@@ -458,7 +544,7 @@ function roleOf(acct) {
   return 'other';
 }
 
-// First and last entry dates, so headings follow current records 
+// First and last entry dates, so headings follow your records (e.g. Dec 1 to Dec 31, 2024)
 function entryRange() {
   const dates = state.entries.map(e => e.entry_date).sort();
   return dates.length
@@ -558,18 +644,22 @@ function renderEquity() {
     return;
   }
 
-  let investment = 0;   // credit balances of capital accounts
+  let beginning = 0;    // capital that existed before the period (e.g. an account named "Beginning Capital")
+  let investment = 0;   // additional investment made during the period
   let withdrawal = 0;   // debit balances of drawings accounts
   for (const acct of state.accounts) {
     const role = roleOf(acct);
     const net = netDrCr(acct.id);
-    if (role === 'capital') investment += -net;
+    if (role === 'capital') {
+      if (/beginning|opening/i.test(acct.name)) beginning += -net;
+      else investment += -net;
+    }
     if (role === 'drawings') withdrawal += net;
   }
 
   const { net } = computeIncome();
   const niAndWd = net - withdrawal;
-  const ending = investment + net - withdrawal;
+  const ending = beginning + investment + net - withdrawal;
   const { to } = entryRange();
 
   box.innerHTML = `
@@ -578,24 +668,29 @@ function renderEquity() {
       <table class="stmt-table">
         <tbody>
           <tr>
+            <td>${OWNER_LABEL}, Capital, Beginning</td>
+            <td class="amt"></td>
+            <td class="amt">${signedMoney(beginning)}</td>
+          </tr>
+          <tr>
             <td>Add: ${OWNER_LABEL} Investment</td>
             <td class="amt"></td>
             <td class="amt">${signedMoney(investment)}</td>
           </tr>
           <tr>
-            <td>${netLabel(net)}</td>
-            <td class="amt"></td>
+            <td class="nested">${netLabel(net)}</td>
             <td class="amt ${net < 0 ? 'loss' : ''}">${signedMoney(net)}</td>
+            <td class="amt"></td>
           </tr>
           <tr>
-            <td>Less: Withdrawal</td>
-            <td class="amt">${signedMoney(-withdrawal)}</td>
+            <td class="nested">Less: Withdrawal</td>
+            <td class="amt single">${signedMoney(withdrawal)}</td>
             <td class="amt"></td>
           </tr>
-          <tr class="total-row">
-            <td></td>
-            <td class="amt single ${niAndWd < 0 ? 'loss' : ''}">${signedMoney(niAndWd)}</td>
+          <tr>
+            <td>Net ${niAndWd < 0 ? 'Decrease' : 'Increase'} in Capital</td>
             <td class="amt"></td>
+            <td class="amt single ${niAndWd < 0 ? 'loss' : ''}">${signedMoney(niAndWd)}</td>
           </tr>
           <tr class="net-row">
             <td>Capital, ${esc(longDate(to))}</td>

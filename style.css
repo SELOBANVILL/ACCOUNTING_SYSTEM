@@ -304,9 +304,12 @@ h3 { margin: 28px 0 12px; }
 .statement-wrap .statement {
   background: #ffffff;
   color: #111111;
-  padding: 20px;
+  padding: 28px 36px;
   border-radius: 8px;
+  max-width: 920px;      /* keeps names and amounts close together */
+  margin: 0 auto;        /* centers the white sheet inside the red card */
 }
+
 .card.scroll { overflow-x: auto; }
 .row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
 .row.between { justify-content: space-between; align-items: center; margin-top: 14px; }
@@ -362,7 +365,7 @@ table.lines tfoot td { font-weight: 700; border-top: 2px solid var(--black); bor
 
 /* ---------- Entry cards ---------- */
 .entry-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
-.entry-head .date { font-weight: 700; color: var(--maroon); }
+.entry-head .date { font-weight: 700; color: var(--white); }
 .empty { text-align: center; color: var(--gray); padding: 30px; }
 
 /* ---------- Trial balance ---------- */

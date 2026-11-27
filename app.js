@@ -546,8 +546,9 @@ function renderTrial() {
 
 // mode: 'period' = From..To, 'before' = earlier than From, 'upto' = everything up to To
 function inRange(e, mode = 'period') {
-  if (mode === 'before') return false;   // nothing outside the period is counted
   const { from, to } = state.period;
+  if (mode === 'before') return !!from && e.entry_date < from;      // earlier than From
+  if (mode === 'upto')   return !to || e.entry_date <= to;          // everything up to To
   return (!from || e.entry_date >= from) && (!to || e.entry_date <= to);
 }
 

@@ -94,6 +94,13 @@
         <button class="tab" data-view="position">Financial Position</button>
         <button class="tab" data-view="cashflow">Cash Flows</button>
       </nav>
+      
+      <div class="period">
+        <strong>Reporting period</strong>
+        <label>From <input type="date" id="period-from"></label>
+        <label>To <input type="date" id="period-to"></label>
+        <button type="button" id="period-clear" class="btn outline">Clear dates</button>
+      </div>
 
       <div class="user">
         <span id="user-email" class="muted"></span>
@@ -155,6 +162,15 @@
             <select id="acc-type">
               <option>Asset</option><option>Liability</option><option>Equity</option>
               <option>Revenue</option><option>Expense</option>
+            </select>
+          </label>
+          <label>Cash flow
+            <select id="acc-cf">
+              <option value="">Auto-detect</option>
+              <option value="cash">Cash account</option>
+              <option value="operating">Operating</option>
+              <option value="investing">Investing</option>
+              <option value="financing">Financing</option>
             </select>
           </label>
           <label class="check"><input type="checkbox" id="acc-contra"> Contra account</label>

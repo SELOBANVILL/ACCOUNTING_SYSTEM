@@ -9,7 +9,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
    2. HELPERS AND ACCOUNTING CONSTANTS
    ===================================================== */
 const $ = (sel, root = document) => root.querySelector(sel);
-const state = { accounts: [], entries: [] };
+const state = { accounts: [], entries: [], period: { from: '', to: '' } };
 
 const TYPE_ORDER = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'];
 const NORMAL = { Asset: 'debit', Expense: 'debit', Liability: 'credit', Equity: 'credit', Revenue: 'credit' };
@@ -206,7 +206,8 @@ $('#account-form').addEventListener('submit', async e => {
 
   const payload = {
     code: $('#acc-code').value.trim(), name: $('#acc-name').value.trim(),
-    type, normal_balance: normal
+    type, normal_balance: normal,
+    cash_flow_category: $('#acc-cf').value || null
   };
 
   const wasEditing = !!editingAccId;
@@ -241,6 +242,7 @@ $('#accounts-body').addEventListener('click', e => {
   $('#acc-code').value = a.code;
   $('#acc-name').value = a.name;
   $('#acc-type').value = a.type;
+  $('#acc-cf').value = a.cash_flow_category || '';
   $('#acc-contra').checked = isContra(a);
   $('#acc-submit').textContent = 'Save changes';
   $('#acc-cancel').classList.remove('hidden');
@@ -323,6 +325,7 @@ function buildEntryForm(kind) {
 
     function reset() {
     editingId = null;
+    $('.e-save', root).disabled = false;
     $('.e-date', root).value = todayStr();
     $('.e-desc', root).value = '';
     linesBody.innerHTML = '';
@@ -357,6 +360,8 @@ function buildEntryForm(kind) {
   $('.e-add', root).addEventListener('click', addLine);
 
 $('.e-save', root).addEventListener('click', async () => {
+  const saveBtn = $('.e-save', root);
+  if (saveBtn.disabled) return;
   const date = $('.e-date', root).value;
   const desc = $('.e-desc', root).value.trim();
   if (!date) return toast('Please choose a date.', true);
@@ -366,6 +371,7 @@ $('.e-save', root).addEventListener('click', async () => {
   for (const tr of linesBody.querySelectorAll('tr')) {
     const acct = $('.acct-select', tr).value;
     const dr = toCents($('.dr', tr).value), cr = toCents($('.cr', tr).value);
+        if (dr < 0 || cr < 0) return toast('Amounts cannot be negative.', true);
     if (!acct && !dr && !cr) continue;                       // skip blank rows
     if (!acct) return toast('Every line with an amount needs an account.', true);
     if (!dr && !cr) return toast('Every line needs a debit or credit.', true);
@@ -375,11 +381,27 @@ $('.e-save', root).addEventListener('click', async () => {
   const { dr, cr } = updateTotals();
   if (dr !== cr) return toast('Debits must equal credits.', true);
 
+    // Warn about an identical entry, then lock the button
+  const sig = ls => ls.map(l => `${l.account_id}|${toCents(l.debit)}|${toCents(l.credit)}`).sort().join(';');
+  const mySig = sig(lines);
+  const dup = state.entries.some(e =>
+    e.id !== editingId && e.kind === kind && e.entry_date === date &&
+    e.description.trim().toLowerCase() === desc.toLowerCase() &&
+    sig(e.journal_lines) === mySig);
+  if (dup && !confirm('An identical entry already exists. Save it anyway?')) return;
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
   const wasEditing = editingId;
   const { error } = await sb.rpc('save_entry', {
     p_date: date, p_description: desc, p_kind: kind, p_lines: lines
   });
-  if (error) return toast(error.message, true);
+  if (error) {
+    saveBtn.disabled = false;
+    saveBtn.textContent = wasEditing ? 'Update entry' : 'Save entry';
+    return toast(error.message, true);
+  }
 
   if (wasEditing) {
     const del = await sb.from('journal_entries').delete().eq('id', wasEditing);
@@ -397,7 +419,7 @@ $('.e-save', root).addEventListener('click', async () => {
 
 function renderEntries(kind) {
   const box = $(kind === 'regular' ? '#journal-list' : '#adjust-list');
-  const list = state.entries.filter(e => e.kind === kind);
+  const list = state.entries.filter(e => e.kind === kind && inRange(e));
   if (!list.length) {
     box.innerHTML = '<div class="card empty">Nothing recorded yet.</div>';
     return;
@@ -455,6 +477,7 @@ function computeTrial() {
     [a.id, { acct: a, unadj: 0, adjDr: 0, adjCr: 0 }]));
 
   for (const entry of state.entries) {
+    if (!inRange(entry, 'period')) continue;
     for (const l of entry.journal_lines) {
       const r = rows.get(l.account_id);
       if (!r) continue;
@@ -521,10 +544,18 @@ function renderTrial() {
    9. FINANCIAL STATEMENTS (all entries, dates from your entries)
    ===================================================== */
 
+// mode: 'period' = From..To, 'before' = earlier than From, 'upto' = everything up to To
+function inRange(e, mode = 'period') {
+  if (mode === 'before') return false;   // nothing outside the period is counted
+  const { from, to } = state.period;
+  return (!from || e.entry_date >= from) && (!to || e.entry_date <= to);
+}
+
 // Net debit-minus-credit for one account, across all entries and adjustments
-function netDrCr(accountId) {
+function netDrCr(accountId, mode = 'period') {
   let net = 0;
   for (const e of state.entries) {
+    if (!inRange(e, mode)) continue;
     for (const l of e.journal_lines) {
       if (l.account_id === accountId) net += toCents(l.debit) - toCents(l.credit);
     }
@@ -536,20 +567,34 @@ function netDrCr(accountId) {
 // so a wrongly typed account cannot distort net income or equity.
 function roleOf(acct) {
   const n = acct.name;
-  if (/accumulated\s+depreciation/i.test(n)) return 'contra-asset';  // never an expense
-  if (/withdraw|drawing/i.test(n)) return 'drawings';                // owner withdrawals
+  // Contra-assets: ticked "Contra account" on an Asset, or named Accumulated Depreciation
+  if (/accumulated\s+depreciation/i.test(n) || (acct.type === 'Asset' && isContra(acct))) return 'contra-asset';
+  // Drawings: only Equity accounts (ticked Contra, or named withdrawal/drawing)
+  if (acct.type === 'Equity' && (isContra(acct) || /withdraw|drawing/i.test(n))) return 'drawings';
   if (acct.type === 'Revenue') return 'revenue';
   if (acct.type === 'Expense') return 'expense';
   if (acct.type === 'Equity') return 'capital';
   return 'other';
 }
 
+function cfCategory(a) {
+  if (a.cash_flow_category) return a.cash_flow_category;
+  const n = a.name, role = roleOf(a);
+  if (a.type === 'Asset' && role === 'other' && /\b(cash|bank|checking|savings|gcash|maya)\b/i.test(n)) return 'cash';
+  if (role === 'drawings' || role === 'capital') return 'financing';
+  if (a.type === 'Liability' && /loan|note|mortgage|bond/i.test(n)) return 'financing';
+  if (role === 'contra-asset' ||
+      (a.type === 'Asset' && /equipment|furniture|fixture|building|land|vehicle|machinery|property|computer/i.test(n))) return 'investing';
+  return 'operating';
+}
+
 // First and last entry dates, so headings follow your records (e.g. Dec 1 to Dec 31, 2024)
 function entryRange() {
-  const dates = state.entries.map(e => e.entry_date).sort();
-  return dates.length
-    ? { from: dates[0], to: dates[dates.length - 1] }
-    : { from: '', to: '' };
+  const dates = state.entries.filter(e => inRange(e, 'period')).map(e => e.entry_date).sort();
+  return {
+    from: state.period.from || dates[0] || '',
+    to:   state.period.to   || dates[dates.length - 1] || ''
+  };
 }
 
 function periodCaption(from, to) {
@@ -560,12 +605,12 @@ function periodCaption(from, to) {
 
 // Label follows the result: "Net Income" when positive, "Net Loss" when negative
 const netLabel = n => (n < 0 ? 'Net Loss' : 'Net Income');
-function computeIncome() {
+function computeIncome(mode = 'period') {
   const revenues = [];
   const expenses = [];
   for (const acct of state.accounts) {
     const role = roleOf(acct);
-    const net = netDrCr(acct.id);
+    const net = netDrCr(acct.id, mode);
     if (role === 'revenue' && net) revenues.push({ acct, bal: -net });  // credits increase revenue
     if (role === 'expense' && net) expenses.push({ acct, bal: net });   // debits increase expenses
   }
@@ -639,23 +684,28 @@ function renderIncome() {
 function renderEquity() {
   const box = $('#equity-report');
 
-  if (!state.accounts.length) {
-    box.innerHTML = '<div class="empty">Add equity accounts and transactions to build this statement.</div>';
+  if (!state.accounts.length || !state.entries.some(e => inRange(e))) {
+    box.innerHTML = '<div class="empty">No transactions in this period.</div>';
     return;
   }
 
-  let beginning = 0;    // capital that existed before the period (e.g. an account named "Beginning Capital")
-  let investment = 0;   // additional investment made during the period
-  let withdrawal = 0;   // debit balances of drawings accounts
+  let beginning = 0, investment = 0, withdrawal = 0, priorWithdrawal = 0;
   for (const acct of state.accounts) {
     const role = roleOf(acct);
-    const net = netDrCr(acct.id);
     if (role === 'capital') {
-      if (/beginning|opening/i.test(acct.name)) beginning += -net;
-      else investment += -net;
+      const before = -netDrCr(acct.id, 'before');   // capital from earlier periods
+      const during = -netDrCr(acct.id, 'period');
+      beginning += before;
+      if (/beginning|opening/i.test(acct.name)) beginning += during;
+      else investment += during;
     }
-    if (role === 'drawings') withdrawal += net;
+    if (role === 'drawings') {
+      withdrawal += netDrCr(acct.id, 'period');
+      priorWithdrawal += netDrCr(acct.id, 'before');
+    }
   }
+  // Earlier periods' profit and withdrawals roll into beginning capital
+  beginning += computeIncome('before').net - priorWithdrawal;
 
   const { net } = computeIncome();
   const niAndWd = net - withdrawal;
@@ -712,7 +762,7 @@ function renderPosition() {
 
   for (const acct of state.accounts) {
     const role = roleOf(acct);
-    const net = netDrCr(acct.id);
+    const net = netDrCr(acct.id, 'upto');        // inside the for loop
     if (!net) continue;
 
     if (role === 'contra-asset' || (role === 'other' && acct.type === 'Asset')) {
@@ -731,11 +781,15 @@ function renderPosition() {
     return;
   }
 
-  const { net: income } = computeIncome();
+  const { net: income } = computeIncome('upto');
   const ownerEquity = investment + income - withdrawal;
   const totalAssets = assets.reduce((s, r) => s + r.bal, 0);
   const totalLiab = liabilities.reduce((s, r) => s + r.bal, 0);
   const totalLiabEquity = totalLiab + ownerEquity;
+  const diff = totalAssets - totalLiabEquity;
+  const checkBadge = diff === 0
+    ? '<span class="badge ok">✓ Balanced</span>'
+    : `<span class="badge bad">✗ Off by ₱${money(Math.abs(diff))}</span>`;
 
   // The last item in a group gets a single underline before the total
   const itemRows = list => list.map((r, i) => `
@@ -745,6 +799,7 @@ function renderPosition() {
     </tr>`).join('');
 
   box.innerHTML = `
+    <div style="margin-bottom:12px">${checkBadge}</div>
     <div class="statement">
       ${stmtHeader('Statement of Financial Position')}
       <table class="stmt-table">
@@ -779,50 +834,58 @@ function renderPosition() {
 
 function renderCashFlow() {
   const box = $('#cashflow-report');
-
-  const isCash = a => a.type === 'Asset' && roleOf(a) === 'other' && /\bcash\b/i.test(a.name);
   const byId = new Map(state.accounts.map(a => [a.id, a]));
+  const isCash = a => cfCategory(a) === 'cash';
 
   let receipts = 0, suppliers = 0, salaries = 0;
-  const investing = new Map();   // account name -> cash effect
+  const investing = new Map();
   const financing = new Map();
   const bump = (map, key, c) => map.set(key, (map.get(key) || 0) + c);
   let touched = false;
 
   for (const entry of state.entries) {
-    // Only entries that touch a cash account affect this statement
-    const hasCash = entry.journal_lines.some(l => {
-      const a = byId.get(l.account_id);
-      return a && isCash(a);
-    });
-    if (!hasCash) continue;
+    if (!inRange(entry, 'period')) continue;
+    const lines = entry.journal_lines;
+    if (!lines.some(l => { const a = byId.get(l.account_id); return a && isCash(a); })) continue;
     touched = true;
 
-    // Every non-cash line explains part of the cash movement:
-    // a credit to it means cash came in, a debit means cash went out.
-    for (const l of entry.journal_lines) {
+    // Non-cash lines: credit = cash came in, debit = cash went out
+    const eff = [];
+    let pos = 0, neg = 0;
+    for (const l of lines) {
       const acct = byId.get(l.account_id);
       if (!acct || isCash(acct)) continue;
       const c = toCents(l.credit) - toCents(l.debit);
       if (!c) continue;
+      eff.push({ acct, c });
+      if (c > 0) pos += c; else neg += -c;
+    }
 
-      const role = roleOf(acct);
-      const n = acct.name;
+    // Remove the part with no cash (e.g. equipment bought with a loan)
+    const offset = Math.min(pos, neg);
+    for (const e of eff) {
+      if (e.c > 0) e.c = pos ? Math.round(e.c * (pos - offset) / pos) : 0;
+      else         e.c = neg ? -Math.round(-e.c * (neg - offset) / neg) : 0;
+    }
+    const drift = (pos - neg) - eff.reduce((s, e) => s + e.c, 0);   // fix rounding
+    const first = eff.find(e => e.c);
+    if (first) first.c += drift;
 
-      if (role === 'drawings') bump(financing, "Owner's withdrawal", c);
-      else if (role === 'capital') bump(financing, 'Investment by owner', c);
-      else if (acct.type === 'Liability' && /loan|note|mortgage|bond/i.test(n)) bump(financing, n, c);
-      else if (role === 'contra-asset' ||
-               (acct.type === 'Asset' && /equipment|furniture|fixture|building|land|vehicle|machinery|property|computer/i.test(n)))
-        bump(investing, n, c);
-      else if (role === 'revenue' || /receivable|unearned/i.test(n)) receipts += c;
+    // Classify using the account's cash flow category
+    for (const { acct, c } of eff) {
+      if (!c) continue;
+      const cat = cfCategory(acct), role = roleOf(acct), n = acct.name;
+      if (cat === 'financing')
+        bump(financing, role === 'drawings' ? "Owner's withdrawal" : role === 'capital' ? 'Investment by owner' : n, c);
+      else if (cat === 'investing') bump(investing, n, c);
+      else if (role === 'revenue' || /receivable|unearned/i.test(n) || c > 0) receipts += c;
       else if (/salar|wage/i.test(n)) salaries += c;
-      else suppliers += c;   // other expenses, payables, supplies, etc.
+      else suppliers += c;
     }
   }
 
   if (!touched) {
-    box.innerHTML = '<div class="empty">No cash transactions yet. Record entries that involve a cash account.</div>';
+    box.innerHTML = '<div class="empty">No cash transactions in this period. Record entries that involve a cash account.</div>';
     return;
   }
 
@@ -837,9 +900,11 @@ function renderCashFlow() {
   const invTotal = sumMap(investing);
   const finTotal = sumMap(financing);
   const netChange = operating + invTotal + finTotal;
+  const beginning = state.accounts.filter(isCash).reduce((s, a) => s + netDrCr(a.id, 'before'), 0);
+  const ending = beginning + netChange;
   const { to } = entryRange();
 
-  const E = '<td class="amt"></td>';   // empty amount cell
+  const E = '<td class="amt"></td>';
 
   const payRows = payments.map((p, i) => {
     const last = i === payments.length - 1;
@@ -887,7 +952,9 @@ function renderCashFlow() {
           ${finRows}
           <tr class="total-row"><td>Net cash from financing activities</td>${E}${E}<td class="amt single">${signedMoney(finTotal)}</td></tr>
 
-          <tr class="net-row"><td>Cash Balance, ${esc(longDate(to))}</td>${E}${E}<td class="amt double">${signedMoney(netChange)}</td></tr>
+          <tr class="net-row"><td>Net ${netChange < 0 ? 'Decrease' : 'Increase'} in Cash</td>${E}${E}<td class="amt single ${netChange < 0 ? 'loss' : ''}">${signedMoney(netChange)}</td></tr>
+          <tr><td>Cash, Beginning</td>${E}${E}<td class="amt single">${signedMoney(beginning)}</td></tr>
+          <tr class="net-row"><td>Cash, Ending (${esc(longDate(to))})</td>${E}${E}<td class="amt double">${signedMoney(ending)}</td></tr>
         </tbody>
       </table>
     </div>`;
@@ -902,8 +969,8 @@ function renderDashboard() {
 
   /* ---- A. Financial summary cards ---- */
   // Same cash-account rule used in the cash flow statement
-  const isCash = a => a.type === 'Asset' && roleOf(a) === 'other' && /\bcash\b/i.test(a.name);
-  const cash = state.accounts.filter(isCash).reduce((s, a) => s + netDrCr(a.id), 0);
+  const isCash = a => cfCategory(a) === 'cash';
+  const cash = state.accounts.filter(isCash).reduce((s, a) => s + netDrCr(a.id, 'upto'), 0);
   const { totalRev, totalExp, net } = computeIncome();
 
   const stats = [
@@ -940,8 +1007,8 @@ function renderDashboard() {
   }
 
   /* ---- C. Accounting overview ---- */
-  const nReg = state.entries.filter(e => e.kind === 'regular').length;
-  const nAdj = state.entries.filter(e => e.kind === 'adjusting').length;
+  const nReg = state.entries.filter(e => e.kind === 'regular' && inRange(e)).length;
+  const nAdj = state.entries.filter(e => e.kind === 'adjusting' && inRange(e)).length;
   $('#dash-overview').innerHTML = [
     ['Total Chart of Accounts', state.accounts.length],
     ['Total Business Transactions', nReg],
@@ -951,7 +1018,7 @@ function renderDashboard() {
 
   /* ---- D. Recent transactions (latest 3 entries, journal and adjustments) ---- */
   // state.entries is already sorted by entry date, then by time created
-  const recent = state.entries.slice(-3).reverse();
+  const recent = state.entries.filter(e => inRange(e)).slice(-3).reverse();
   if (!recent.length) {
     $('#dash-recent').innerHTML = '<div class="empty">No transactions recorded yet.</div>';
   } else {
@@ -992,5 +1059,17 @@ function renderDashboard() {
 /* =====================================================
    10. START
    ===================================================== */
+function applyPeriod() {
+  const from = $('#period-from').value, to = $('#period-to').value;
+  if (from && to && from > to) return toast('"From" cannot be later than "To".', true);
+  state.period = { from, to };
+  renderAll();
+}
+$('#period-from').addEventListener('change', applyPeriod);
+$('#period-to').addEventListener('change', applyPeriod);
+$('#period-clear').addEventListener('click', () => {
+  $('#period-from').value = ''; $('#period-to').value = '';
+  applyPeriod();
+});
 buildEntryForm('regular');
 buildEntryForm('adjusting');
